@@ -14,6 +14,8 @@ Oyundaki tüm görseller OpenAI GPT görsel üretimiyle, Codex CLI üzerinden ü
 | `art/map_items.png` | 3×3: mavi, altın, kilitli, boss, bonus, süreli balon; mihenk taşı kemeri, hazine sandığı, altın para (yeşil perdede üretildi) | `assets/bal_*.png`, `milestone.png`, `chest.png`, `coin.png` |
 | `art/skills.png` | 3×3: Yavaşlat, +2 İğne, +15 Saniye jokerleri; küçük/orta/büyük altın paketi; market, harita, kilit simgeleri | `assets/sk_*.png`, `pack_*.png`, `shop.png`, `map.png`, `lock.png` |
 | `art/mapbg/map1..3.png` | 1024×1536 harita arka planları: gündüz tepeler, günbatımı dağlar, auroralı gece | `assets/map1..3.webp` (kısımlarda sırayla) |
+| `art/needles.png` | 2×1, yeşil perde: düz gümüş dikiş iğnesi ve eski bronz iğne (topuzsuz) | `assets/pin.png`, `assets/pin_old.png` (parts.png içindeki topuzlu iğnelerin yerine) |
+| `art/sk_pins2.png` | +2 İğne joker simgesi, düz iğnelerle; yeşil zemin yalnızca kenardan silindi (yeşil artı rozeti korunur) | `assets/sk_pins2.png` |
 | `art/logo.png` | Orbitapp logosu: "O" harfi iğne saplı parlak küre, yörünge çizgisi; yeşil perdede üretildi | `assets/logo.png` (900 px), giriş ekranı ve hoş geldin penceresi |
 | `art/bg/bg1..6.png` | 1024×1536 dikey arka planlar, kürelerle aynı renk temaları | `assets/bg1..6.webp` (768×1152) |
 

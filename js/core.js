@@ -288,7 +288,8 @@ function makeLevel(node) {
     }
   }
   // kapasite: 3 yıldız için gereken iğne + hazır iğneler küreye rahat sığmalı
-  const density = Math.max(2.35, 3.4 - n * 0.02);
+  // iğne başına ayrılan açı = GAP × density; GAP daralınca density aynı oranda artar (zorluk değişmez)
+  const density = Math.max(2.35, 3.4 - n * 0.02) * (0.1276 / GAP);
   let pre = n === 1 ? 0 : Math.min(Math.floor((n + 1) / 4), 5);
   const need = () => lv.thresholds[2] + pre + 1;
   const cap = () => Math.floor((TAU - lv.zones.reduce((s, z) => s + z.width + GAP, 0)) / (GAP * density));

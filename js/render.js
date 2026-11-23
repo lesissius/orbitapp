@@ -77,7 +77,7 @@ function drawPin(tx, ty, dir, len, kind = 'pin', hit = false) {
   const hx = tx + Math.cos(dir) * len, hy = ty + Math.sin(dir) * len;
   const im = IMG[kind] || IMG.pin;
   if (!im) { drawPinVec(tx, ty, hx, hy, hit ? '#ff4d6d' : kind === 'pin_old' ? 'rgba(255,255,255,0.55)' : theme().pin, hit); return; }
-  const h = len + HEAD, w = h * (im.width / im.height) * 0.85;
+  const h = len + HEAD, w = Math.max(h * (im.width / im.height), R * 0.11); // düz iğne: görünen kalınlık çarpışma aralığına yakın
   ctx.save(); ctx.translate(tx, ty); ctx.rotate(dir + Math.PI / 2); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore();
   if (hit) glowAt(hx, hy, HEAD * 5, 'rgba(255,60,80,0.9)');
 }

@@ -17,11 +17,15 @@ function layout() {
   const cs = getComputedStyle(document.getElementById('safe'));
   SAFE = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0 };
   const s = Math.min(W, H * 0.62);
-  cx = W / 2; cy = H * 0.37 + SAFE.top * 0.5;
-  R = s * (W < 500 ? 0.17 : 0.16); L = R * 1.25; HEAD = Math.max(5, R * 0.13);
-  LAUNCH_Y = Math.min(H * 0.79, H - SAFE.bottom - L - 40);
+  // büyük küre, düz ve biraz kısa iğneler: küre + iğneler ekrana sığar
+  R = s * (W < 500 ? 0.235 : 0.21); L = R * 0.95; HEAD = Math.max(4, R * 0.05);
+  cx = W / 2;
+  LAUNCH_Y = Math.min(H * 0.8, H - SAFE.bottom - L - 40);
+  // üstteki bilgi alanına (≈120 px) girmesin, alttaki atış noktasına da yaklaşmasın
+  cy = Math.max(H * 0.37 + SAFE.top * 0.5, SAFE.top + 118 + R + L);
+  cy = Math.min(cy, LAUNCH_Y - (R + L) - 24);
 }
-GAP = 2 * Math.asin(0.13 / 2.25) + 0.012; // açısal boşluk ekrandan bağımsız: seviyeler her cihazda aynı
+GAP = 0.085; // iki iğne arası en az açı (düz iğnelerin görünen kalınlığına yakın); ekrandan bağımsız, seviyeler her cihazda aynı
 
 function startLevel(node) {
   curNode = node; lv = makeLevel(node);
@@ -331,7 +335,8 @@ function simLevel(id, maxTime = 120) {
   startLevel(node);
   if (state === 'bossintro') { state = 'play'; stateT = 0; }
   const dt = 1 / 120, travel = (LAUNCH_Y - (cy + R)) / Math.max(H * 3.2, 1800);
-  const safeAt = (a) => !lv.zones.some(z => inArc(a, { start: z.start - GAP * 0.6, width: z.width + GAP * 1.2 })) && stuck.every(s => angDiff(s.a, a) > GAP * 1.3);
+  const zm = (z) => Math.max(GAP * 0.6, 0.09) + (z.vel ? Math.abs(z.vel) * (travel + 0.05) + 0.02 : 0); // kayan plakanın uçuş süresindeki yolu da pay
+  const safeAt = (a) => !lv.zones.some(z => inArc(a, { start: z.start - zm(z), width: z.width + zm(z) * 2 })) && stuck.every(s => angDiff(s.a, a) > GAP * 1.3);
   let time = 0, minFree = 1;
   while (time < maxTime && state === 'play') {
     if (flying.length === 0 && pinsLeft > 0) {

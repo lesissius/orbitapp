@@ -154,6 +154,54 @@ if (existsSync(art('ui_home.png'))) {
   console.log('ui_home');
 }
 
+// Düz iğneler (2×1, yeşil perde) → assets/pin.png, pin_old.png (topuzlu iğnelerin yerine)
+if (existsSync(art('needles.png'))) {
+  const { data, info } = await sharp(art('needles.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], m = Math.max(r, b);
+    if (g > 120 && g > m * 1.35) { px[i + 3] = 0; continue; }
+    if (g > m) { const spill = (g - m) / Math.max(1, g); px[i + 1] = m; px[i + 3] = Math.round(px[i + 3] * (1 - Math.min(0.8, spill * 1.5))); }
+  }
+  const half = Math.floor(info.width / 2);
+  for (const [k, name] of ['pin', 'pin_old'].entries()) {
+    const buf = await sharp(px, { raw: { width: info.width, height: info.height, channels: 4 } }).extract({ left: k * half, top: 0, width: half, height: info.height }).png().toBuffer();
+    const trimmed = await sharp(buf).trim({ threshold: 1 }).png().toBuffer();
+    await sharp(trimmed).resize({ height: 384, withoutEnlargement: true }).png().toFile(out(name + '.png'));
+    const meta = await sharp(out(name + '.png')).metadata();
+    console.log(name, meta.width + 'x' + meta.height);
+  }
+}
+
+// +2 İğne joker simgesi, düz iğnelerle (yeşil perde) → assets/sk_pins2.png (sayfadaki eski simgenin yerine)
+if (existsSync(art('sk_pins2.png'))) {
+  const { data, info } = await sharp(art('sk_pins2.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data), w = info.width, h = info.height;
+  // yalnızca kenardan ulaşılan yeşil zemin silinir (simgedeki yeşil artı rozeti korunur)
+  const isKey = (i) => { const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2]; return g > 120 && g > Math.max(r, b) * 1.35; };
+  const seen = new Uint8Array(w * h), stack = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const i = stack.pop(); if (seen[i] || !isKey(i)) continue;
+    seen[i] = 1; px[i * 4 + 3] = 0;
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0) stack.push(i - 1); if (x < w - 1) stack.push(i + 1); if (y > 0) stack.push(i - w); if (y < h - 1) stack.push(i + w);
+  }
+  // zemine değen kenar piksellerinde yeşil taşmayı bastır
+  for (let i = 0; i < w * h; i++) {
+    if (seen[i]) continue;
+    const x = i % w, y = (i / w) | 0;
+    const nearBg = (x > 0 && seen[i - 1]) || (x < w - 1 && seen[i + 1]) || (y > 0 && seen[i - w]) || (y < h - 1 && seen[i + w]);
+    if (!nearBg) continue;
+    const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2], m = Math.max(r, b);
+    if (g > m) { px[i * 4 + 1] = m; px[i * 4 + 3] = Math.round(px[i * 4 + 3] * 0.6); }
+  }
+  const buf = await sharp(px, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+  await sharp(await sharp(buf).trim({ threshold: 1 }).png().toBuffer()).resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile(out('sk_pins2.png'));
+  console.log('sk_pins2 (düz iğne)');
+}
+
 // Orbitap logosu (yeşil perde) → assets/logo.png (en fazla 900 px genişlik)
 if (existsSync(art('logo.png'))) {
   const { data, info } = await sharp(art('logo.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
