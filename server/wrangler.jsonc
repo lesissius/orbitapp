@@ -1,0 +1,18 @@
+{
+  "name": "igne-ustasi-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "igne-ustasi",
+      "database_id": "789b3feb-c9d5-4b95-9450-3b18cfe13270",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // Oyunun açıldığı adresler (virgülle ayrılır)
+    "ALLOWED_ORIGINS": "https://lesissius.github.io,http://localhost:5176,http://127.0.0.1:5176"
+  },
+  "observability": { "enabled": true }
+}

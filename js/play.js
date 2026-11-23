@@ -25,6 +25,8 @@ GAP = 2 * Math.asin(0.13 / 2.25) + 0.012; // açısal boşluk ekrandan bağıms�
 
 function startLevel(node) {
   curNode = node; lv = makeLevel(node);
+  // küredeki altın para yalnızca bölüm ilk kez geçilene kadar çıkar (tekrar oynayarak altın kasılmasın)
+  if (lv.kind !== 'bonus' && starsOf(node.id) > 0) lv.targets = lv.targets.filter(x => x.kind !== 'coin');
   screen = 'play'; paused = false; overlay = null;
   rot = 0; t = 0; dirMul = 1;
   stuck = lv.pre.map(a => ({ a, pre: true }));

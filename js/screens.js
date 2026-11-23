@@ -44,7 +44,9 @@ function drawTitle() {
     sprite('ui_trophy', cx - m * 0.17, ty, m * 0.08);
     text(`★ ${totalStars()}   ·   Kısım ${maxOpenChapter()}`, cx + m * 0.03, ty, m * 0.04, '#ffd34d', 900);
   }
-  addButton(0, 0, W, H, () => { audio(); screen = 'map'; viewChapter = maxOpenChapter(); scrollToCurrent(); musicUpdate(); });
+  if (ACCOUNT) text(ACCOUNT.guest ? 'Misafir olarak oynuyorsun' : `Hoş geldin, ${ACCOUNT.username}`, cx, SAFE.top + 40, m * 0.038, 'rgba(255,255,255,0.85)', 800);
+  const enter = () => { screen = 'map'; viewChapter = maxOpenChapter(); scrollToCurrent(); musicUpdate(); };
+  addButton(0, 0, W, H, () => { audio(); if (ACCOUNT) enter(); else showAuth('welcome', { after: enter }); });
 }
 
 // ---------- harita ----------
@@ -183,8 +185,9 @@ function drawMarket(m) {
     text(info.desc, px + 82, y + rowH * 0.58, 12, 'rgba(255,255,255,0.65)', 600, 'left', false);
     const p1 = info.price, p3 = Math.round(info.price * 2.5);
     const bw = 76, bh2 = Math.min(30, (rowH - 16) / 2), bx = px + pw - 22 - bw, byy = y + (rowH - 8) / 2 - bh2 - 2;
-    textButton(`×1  ${p1}`, bx, byy, bw, bh2, () => buySkill(k, 1, p1), '#ffd34d', '#2a1a00', P.gold >= p1);
-    textButton(`×3  ${p3}`, bx, byy + bh2 + 4, bw, bh2, () => buySkill(k, 3, p3), '#ffd34d', '#2a1a00', P.gold >= p3);
+    const guest = ACCOUNT && ACCOUNT.guest, lock = guest ? '🔒 ' : '';
+    textButton(`${lock}×1  ${p1}`, bx, byy, bw, bh2, () => buySkill(k, 1, p1), '#ffd34d', '#2a1a00', guest || P.gold >= p1);
+    textButton(`${lock}×3  ${p3}`, bx, byy + bh2 + 4, bw, bh2, () => buySkill(k, 3, p3), '#ffd34d', '#2a1a00', guest || P.gold >= p3);
     y += rowH;
   }
   y += 6;
@@ -196,31 +199,60 @@ function drawMarket(m) {
     ctx.fillStyle = 'rgba(255,255,255,0.06)'; roundRect(x, y, cw, 128, 14); ctx.fill();
     sprite(icon, x + cw / 2, y + 36, 52);
     text(`${amount}`, x + cw / 2, y + 74, 17, '#ffd34d', 900, 'center', false);
-    textButton(price, x + 8, y + 90, cw - 16, 30, () => showToast('Gerçek para ile satın alma, uygulama mağazaya çıkınca açılacak'), '#7aa7ff', '#0d1430');
+    textButton(price, x + 8, y + 90, cw - 16, 30, () => {
+      if (guestBlocked()) return;
+      showToast('Gerçek para ile satın alma, uygulama mağazaya çıkınca açılacak');
+    }, '#7aa7ff', '#0d1430');
   });
   y += 136;
-  text('Gerçek para ödemesi henüz bağlı değil, fiyatlar örnektir.', cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
+  if (ACCOUNT && ACCOUNT.guest) {
+    text('Misafir hesapla satın alma yapılamaz.', cx, y + 4, 12, '#ffd34d', 800);
+    text('Hesap oluştur, ilerlemen aynen aktarılır.', cx, y + 22, 12, '#ffd34d', 700);
+  }
+  else text('Gerçek para ödemesi henüz bağlı değil, fiyatlar örnektir.', cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
+}
+// Misafirler satın alma yapamaz: hesap oluşturma ekranı açılır
+function guestBlocked() {
+  if (!ACCOUNT || !ACCOUNT.guest) return false;
+  showAuth('register', { reason: 'Satın alma için hesap gerekli. Misafir ilerlemen, altınların ve jokerlerin hesabına aktarılır.' });
+  return true;
 }
 function buySkill(k, n, price) {
+  if (guestBlocked()) return;
   if (P.gold < price) { showToast('Yeterli altın yok'); return; }
   P.gold -= price; P.skills[k] = (P.skills[k] || 0) + n; saveProgress();
   sfx.coin(); showToast(`${SKILL_INFO[k].name} ×${n} alındı`);
 }
 
 function drawSettings(m) {
-  const pw = Math.min(W - 32, 400), ph = 300, px = cx - pw / 2, py = (H - ph) / 2;
+  const guest = !ACCOUNT || ACCOUNT.guest;
+  const pw = Math.min(W - 32, 400), ph = guest ? 400 : 344, px = cx - pw / 2, py = Math.max(SAFE.top + 16, (H - ph) / 2);
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   closeX(px, py, pw);
   text('AYARLAR', cx, py + 36, m * 0.06, '#fff', 900);
   drawToggles(px + 24, py + 76, pw - 48, m);
   ctx.globalAlpha = 1;
-  const rt = resetArmed ? 'Emin misin? Tekrar dokun: her şey silinir' : 'İlerlemeyi sıfırla';
-  text(rt, cx, py + ph - 40, 14, resetArmed ? '#ff6b81' : 'rgba(255,255,255,0.5)', 700);
-  addButton(px + 20, py + ph - 62, pw - 40, 44, () => {
-    if (!resetArmed) { resetArmed = true; return; }
-    P = JSON.parse(JSON.stringify(DEFAULT_PROGRESS)); saveProgress();
-    viewChapter = 1; overlay = null; scrollToCurrent(); showToast('İlerleme sıfırlandı');
-  });
+  // hesap
+  let y = py + 196;
+  ctx.fillStyle = 'rgba(255,255,255,0.07)'; roundRect(px + 16, y, pw - 32, 56, 14); ctx.fill();
+  text(guest ? 'Misafir hesap' : ACCOUNT.username, px + 30, y + 20, 17, '#fff', 900, 'left', false);
+  const sync = !ACCOUNT ? '' : ACCOUNT.offline || syncState === 'offline' ? 'Çevrimdışı · bağlanınca kaydedilecek' : syncState === 'error' ? 'Kaydedilemedi' : syncState === 'saving' ? 'Kaydediliyor…' : 'İlerleme bulutta kayıtlı';
+  text(sync, px + 30, y + 40, 12, syncState === 'error' ? '#ff8da1' : 'rgba(255,255,255,0.6)', 600, 'left', false);
+  y += 68;
+  const bw = (pw - 42) / 2;
+  if (guest) {
+    textButton('Hesap oluştur', px + 16, y, bw, 46, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
+    textButton('Giriş yap', px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('login'); }, '#7aa7ff', '#0d1430');
+  } else {
+    textButton('Çıkış yap', px + 16, y, bw, 46, async () => { overlay = null; await logout(); afterSignOut('Çıkış yapıldı'); }, '#7aa7ff', '#0d1430');
+    textButton('Hesabı sil', px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('delete'); }, '#ff8f9f', '#2a0710');
+  }
+  y += 58;
+  if (guest) {
+    text('Misafirken satın alma yapılamaz. Hesap oluşturursan ilerlemen aktarılır.', cx, y + 10, 11, 'rgba(255,255,255,0.55)', 600);
+    text('Misafir hesabını sil', cx, y + 40, 13, 'rgba(255,141,161,0.8)', 700);
+    addButton(px + 40, y + 26, pw - 80, 30, () => { overlay = null; showAuth('delete'); });
+  }
 }
 
 function drawMilestone(m) {
@@ -308,6 +340,7 @@ cv.addEventListener('pointercancel', () => { down = null; });
 cv.addEventListener('wheel', (e) => { if (screen === 'map' && !overlay) mapScroll = clamp(mapScroll - e.deltaY, 0, mapMaxScroll()); }, { passive: true });
 cv.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
+  if (authRoot.classList.contains('open')) return; // üyelik formunda yazarken oyun tuşları çalışmasın
   if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); if (!e.repeat) { if (paused && !overlay) setPaused(false); else throwPin(); } }
   if (e.code === 'Escape' || e.code === 'KeyP') { if (overlay) closeOverlay(); else setPaused(!paused); }
   if (e.code === 'Digit1') useSkill('slow');

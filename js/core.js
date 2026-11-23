@@ -48,18 +48,45 @@ function chapterNodes(c) {
 
 // ---------- ilerleme ----------
 const DEFAULT_PROGRESS = { stars: {}, bonus: {}, ms: {}, gold: 0, skills: { slow: 0, pins2: 2, time15: 0 }, seen: {}, tutorial: false, lastId: '1-1' };
-let P = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PROGRESS)), store.get('p2', {}));
-P.skills = Object.assign({ slow: 0, pins2: 0, time15: 0 }, P.skills);
-// eski sürümden geçiş: geçilmiş seviyeler 1 yıldızla işaretlenir
-if (!store.get('p2', null)) {
-  const oldBest = store.get('best', 1), oldStars = store.get('stars', {});
-  for (let n = 1; n < oldBest; n++) {
-    const c = Math.floor((n - 1) / 10) + 1, i = (n - 1) % 10 + 1;
-    P.stars[`${c}-${i}`] = Math.max(1, Math.min(3, oldStars[n] || 1));
-  }
-  if (oldBest > 1) P.tutorial = true;
+// Altın + jokerlerin değeri, oyunda kazanılabilecek en yüksek değeri aşamaz (sunucu da aynı kontrolü yapar).
+const STAR_GOLD = [0, 3, 8, 12], SKILL_VALUE = 85;
+function earnedValue(p) {
+  let v = 2 * SKILL_VALUE;
+  for (const s of Object.values(p.stars)) v += (STAR_GOLD[s] || 0) + 2;
+  for (const [c, ok] of Object.entries(p.ms)) if (ok) { const r = milestoneReward(Number(c)); v += r.gold + (r.slow + r.pins2 + r.time15) * SKILL_VALUE; }
+  for (const [id, ok] of Object.entries(p.bonus)) if (ok) v += parseInt(id, 10) % 2 ? 18 : 3 * SKILL_VALUE;
+  return v;
 }
-const saveProgress = () => store.set('p2', P);
+function normalizeProgress(raw) {
+  const p = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PROGRESS)), raw || {});
+  p.skills = Object.assign({ slow: 0, pins2: 0, time15: 0 }, p.skills);
+  for (const k of ['stars', 'bonus', 'ms', 'seen']) if (!p[k] || typeof p[k] !== 'object') p[k] = {};
+  p.gold = Math.max(0, Math.floor(p.gold || 0));
+  // eski sürümlerin cömert ekonomisinden kalan fazlalık kırpılır (önce altın, sonra jokerler)
+  let over = p.gold + SKILL_VALUE * (p.skills.slow + p.skills.pins2 + p.skills.time15) - earnedValue(p);
+  if (over > 0) { const g = Math.min(p.gold, over); p.gold -= g; over -= g; }
+  for (const k of ['slow', 'time15', 'pins2']) while (over > 0 && p.skills[k] > 0) { p.skills[k]--; over -= SKILL_VALUE; }
+  return p;
+}
+// Cihazda hesapsız dönemden kalan ilerleme (ilk açılan hesaba bir kez taşınır)
+function takeLegacyProgress(remove = true) {
+  let p = store.get('p2', null);
+  if (!p) {
+    const oldBest = store.get('best', 1), oldStars = store.get('stars', {});
+    if (oldBest > 1) {
+      p = { stars: {}, tutorial: true };
+      for (let n = 1; n < oldBest; n++) { const c = Math.floor((n - 1) / 10) + 1, i = (n - 1) % 10 + 1; p.stars[`${c}-${i}`] = Math.max(1, Math.min(3, oldStars[n] || 1)); }
+    }
+  }
+  if (remove) try { for (const k of ['p2', 'best', 'level', 'stars', 'lives', 'seen']) localStorage.removeItem('igne_' + k); } catch {}
+  return p ? normalizeProgress(p) : null;
+}
+let P = normalizeProgress(null);
+const saveProgress = () => {
+  if (SIM || typeof ACCOUNT === 'undefined' || !ACCOUNT) return;
+  store.set('p2_' + ACCOUNT.id, P);
+  schedulePush();
+};
 
 const starsOf = (id) => P.stars[id] || 0;
 const chapterStars = (c) => { let s = 0; for (let i = 1; i <= 10; i++) s += starsOf(`${c}-${i}`); return s; };

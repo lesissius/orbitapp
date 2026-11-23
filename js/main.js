@@ -10,6 +10,11 @@ function frame(nowMs) {
   requestAnimationFrame(frame);
 }
 layout();
+// Kayıtlı hesap varsa cihazdaki son kaydı yükle, sonra sunucudakiyle karşılaştır
+if (ACCOUNT) {
+  P = normalizeProgress(store.get('p2_' + ACCOUNT.id, null));
+  refreshFromServer();
+}
 viewChapter = maxOpenChapter();
 requestAnimationFrame(frame);
 

@@ -147,3 +147,42 @@ Oyun tek dosyadan beş dosyaya ayrıldı:
 - `js/main.js`: döngü ve başlangıç
 
 Eski ilerleme yeni yapıya taşınıyor: geçilen seviyeler 1 yıldızla işaretleniyor.
+
+---
+
+# Sürüm 3: bulut hesap ve misafir girişi
+
+## Nasıl çalışıyor
+
+- **İlk açılış:** Hoş geldin ekranında üç seçenek var: **Hesap oluştur**, **Giriş yap**, **Misafir olarak oyna**.
+- **Hesap:** Kullanıcı adı (3–16 karakter) ve şifre (en az 6 karakter). E-posta istenmiyor.
+- **İlerleme bulutta:** Yıldızlar, altın, jokerler ve mihenk taşları sunucuda tutuluyor. Her değişiklikten 1,5 saniye sonra ve uygulama arka plana geçince kaydediliyor. İnternet yoksa cihazda bekliyor, bağlantı gelince gönderiliyor.
+- **Misafir:**
+  - Kayıt olmadan oynuyor, ilerlemesi yine sunucuda tutuluyor.
+  - Marketten satın alma yapamıyor; denerse "hesap oluştur" ekranı açılıyor.
+  - Hesap oluşturunca aynı hesap yükseltiliyor, ilerleme, altın ve jokerler aynen aktarılıyor.
+- **Aynı cihazda birden fazla hesap:** Her hesabın ilerlemesi cihazda ayrı tutuluyor, karışmıyor.
+- **İki cihaz:** Aynı hesapla iki cihazda oynanırsa en yeni kayıt kazanıyor; eski cihaz açılınca yeni ilerlemeyi alıyor.
+- **Ayarlar:** Hesap adı, kayıt durumu, Çıkış yap ve Hesabı sil (şifreyle onaylanır, her şey kalıcı olarak silinir; App Store kuralı). Misafir için Hesap oluştur, Giriş yap ve Misafir hesabını sil.
+- **Eski ilerleme:** Hesapsız dönemden kalan ilerleme bu cihazda açılan ilk hesaba bir kez taşınıyor. Eski sürümlerin cömert ekonomisinden kalan fazla altın yeni sınıra göre kırpılıyor.
+
+## Güvenlik
+
+- Şifreler PBKDF2-SHA256 ile 100.000 turda, rastgele tuzla özetleniyor; şifrenin kendisi hiçbir yerde saklanmıyor.
+- Oturum anahtarlarının yalnızca SHA-256 özeti tutuluyor. Oturumlar 180 gün geçerli.
+- Aynı IP ve kullanıcı adı için 15 dakikada en fazla 8 hatalı giriş denemesi yapılabiliyor.
+- Sunucu yalnızca oyunun adresinden (lesissius.github.io) gelen isteklere izin veriyor.
+- **Hile sınırı:** Sunucu, kaydedilen altın ve joker değerinin yıldızlardan, mihenk taşlarından ve bonuslardan kazanılabilecek en yüksek değeri aşmasına izin vermiyor. Küredeki altın para artık yalnızca bölüm ilk kez geçilene kadar çıkıyor; tekrar oynayarak altın kasılamıyor.
+
+## Sunucu
+
+- Cloudflare Worker: `igne-ustasi-api` (https://igne-ustasi-api.munaris.workers.dev)
+- D1 veritabanı: `igne-ustasi`
+- Kod `server/` klasöründe. Yeniden yayınlamak için `server` klasöründe `wrangler deploy`; tablo değişikliği için `wrangler d1 migrations apply igne-ustasi --remote`.
+
+## Gerçek parayla satıştan önce yapılması gerekenler
+
+- Satın almayı sunucu üzerinden yapmak: altını sunucu versin, istemci yalnızca sonucu göstersin.
+- Google Play ve App Store ödeme makbuzlarını sunucuda doğrulamak.
+- Gizlilik politikası (KVKK): hangi verinin tutulduğu, nasıl silineceği.
+- Uygulamada "Apple ile giriş" ve "Google ile giriş" seçenekleri.
