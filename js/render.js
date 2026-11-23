@@ -1,4 +1,4 @@
-// İğne Ustası: oyun ekranının çizimi ve ortak arayüz parçaları
+// Orbitap: oyun ekranının çizimi ve ortak arayüz parçaları
 'use strict';
 let uiButtons = [];
 const addButton = (x, y, w, h, action) => uiButtons.push({ x, y, w, h, action });

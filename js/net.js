@@ -1,4 +1,4 @@
-// İğne Ustası: hesap ve ilerleme eşitleme (Cloudflare Worker API)
+// Orbitap: hesap ve ilerleme eşitleme (Cloudflare Worker API)
 'use strict';
 const API_BASE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   ? 'http://127.0.0.1:8787'

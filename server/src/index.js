@@ -1,4 +1,4 @@
-// İğne Ustası hesap sunucusu (Cloudflare Worker + D1)
+// Orbitap hesap sunucusu (Cloudflare Worker + D1)
 // Misafir hesabı, kullanıcı adı + şifre ile kayıt/giriş, ilerleme eşitleme, hesap silme, günlük temizlik.
 // Güvenlik: PBKDF2 şifre özeti, oturum anahtarının yalnızca özeti, IP'nin yalnızca tuzlanmış özeti,
 // istek sınırları, kullanıcı adı filtresi, ilerleme için yapı + sıra + değer + hız kontrolleri.
@@ -34,7 +34,7 @@ const TR_FOLD = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'i̇': 'i', 'ö': 'o', 'ş': 
 const usernameKey = (u) => u.replace(/İ/g, 'i').replace(/I/g, 'i').toLowerCase().replace(/[çğıöşü]/g, (c) => TR_FOLD[c] || c);
 // Filtre için daha gevşek: rakam benzeri harfler ve alt çizgi de sadeleşir ("4dm1n" = "admin")
 const loose = (u) => usernameKey(u).replace(/_/g, '').replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't');
-const RESERVED_PARTS = ['admin', 'moderator', 'yonetici', 'destek', 'support', 'igneustasi', 'resmi', 'official', 'gelistirici', 'developer', 'yetkili', 'sistem', 'system', 'anthropic', 'claude'];
+const RESERVED_PARTS = ['admin', 'moderator', 'yonetici', 'destek', 'support', 'igneustasi', 'orbitap', 'resmi', 'official', 'gelistirici', 'developer', 'yetkili', 'sistem', 'system', 'anthropic', 'claude'];
 const RESERVED_EXACT = ['mod', 'gm', 'root', 'staff', 'owner', 'kurucu', 'null', 'undefined', 'misafir', 'guest', 'igne', 'oyun'];
 const BAD_PARTS = ['orospu', 'siktir', 'sikerim', 'sikik', 'yarrak', 'yarak', 'amcik', 'amina', 'anani', 'kahpe', 'pezevenk', 'ibne', 'gavat', 'fuck', 'shit', 'bitch', 'nigg', 'cunt', 'porn', 'hitler', 'nazi', 'whore', 'rape'];
 const BAD_EXACT = ['amk', 'aq', 'sik', 'oc', 'pic', 'got', 'mk', 'dick', 'sex', 'kke', 'pkk', 'isid', 'isis'];

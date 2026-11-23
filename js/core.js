@@ -1,4 +1,4 @@
-// İğne Ustası: çekirdek (kayıt, ayarlar, ses, görseller, bölüm kataloğu, ilerleme, seviye üretimi)
+// Orbitap: çekirdek (kayıt, ayarlar, ses, görseller, bölüm kataloğu, ilerleme, seviye üretimi)
 'use strict';
 const TAU = Math.PI * 2;
 const cv = document.getElementById('c');
@@ -230,7 +230,7 @@ const theme = () => THEMES[themeIndex()];
 const IMG = {};
 const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
   'orb1', 'orb2', 'orb3', 'orb4', 'orb5', 'orb6', 'boss1', 'boss2', 'boss3',
-  'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home',
+  'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home', 'logo',
   'bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin',
   'sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'];
 for (const n of SPRITES) { const im = new Image(); im.onload = () => { IMG[n] = im; }; im.src = `assets/${n}.png`; }

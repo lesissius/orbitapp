@@ -1,4 +1,4 @@
-// İğne Ustası: başlangıç, sabit adımlı döngü, çevrimdışı destek, test kancası
+// Orbitap: başlangıç, sabit adımlı döngü, çevrimdışı destek, test kancası
 'use strict';
 const STEP = 1 / 120;
 let last = performance.now(), acc = 0;

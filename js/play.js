@@ -1,4 +1,4 @@
-// İğne Ustası: oynanış (bölüm başlatma, atış, çarpışma, jokerler, süre, sonuç, test botu)
+// Orbitap: oynanış (bölüm başlatma, atış, çarpışma, jokerler, süre, sonuç, test botu)
 'use strict';
 let screen = 'title';          // 'title' | 'map' | 'play'
 let paused = false;

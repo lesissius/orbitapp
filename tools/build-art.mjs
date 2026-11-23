@@ -154,6 +154,21 @@ if (existsSync(art('ui_home.png'))) {
   console.log('ui_home');
 }
 
+// Orbitap logosu (yeşil perde) → assets/logo.png (en fazla 900 px genişlik)
+if (existsSync(art('logo.png'))) {
+  const { data, info } = await sharp(art('logo.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], m = Math.max(r, b);
+    if (g > 120 && g > m * 1.35) { px[i + 3] = 0; continue; }
+    if (g > m) { const spill = (g - m) / Math.max(1, g); px[i + 1] = m; px[i + 3] = Math.round(px[i + 3] * (1 - Math.min(0.8, spill * 1.5))); }
+  }
+  const buf = await sharp(px, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+  const trimmed = await sharp(buf).trim({ threshold: 1 }).png().toBuffer();
+  await sharp(trimmed).resize({ width: 900, withoutEnlargement: true }).png({ compressionLevel: 9 }).toFile(out('logo.png'));
+  console.log('logo');
+}
+
 // Uygulama simgeleri (ana ekrana ekleme)
 if (existsSync(art('icon.png'))) {
   for (const s of [192, 512]) await sharp(art('icon.png')).resize(s, s).png().toFile(join(root, `icon-${s}.png`));

@@ -1,4 +1,4 @@
-// İğne Ustası: üyelik ekranları (hoş geldin, kayıt, giriş, hesap silme). Metin kutuları için HTML kullanılır.
+// Orbitap: üyelik ekranları (hoş geldin, kayıt, giriş, hesap silme). Metin kutuları için HTML kullanılır.
 'use strict';
 const authRoot = document.createElement('div');
 authRoot.id = 'auth';
@@ -37,6 +37,7 @@ authStyle.textContent = `
 #auth .langs{display:flex;gap:6px;justify-content:center;margin:-6px 0 12px}
 #auth button.lang{width:auto;margin:0;padding:6px 12px;font-size:13px;font-weight:800;border-radius:10px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.75);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
 #auth button.lang.on{background:#ffb84d;color:#1a1030}
+#auth .wordmark{display:block;width:100%;max-width:300px;height:auto;margin:0 auto 6px}
 #auth .logo{display:block;width:84px;height:84px;margin:0 auto 8px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
 `;
 document.head.appendChild(authStyle);
@@ -64,7 +65,7 @@ function showAuth(mode, opts = {}) {
   const terms = `<a href="${privacyUrl()}" target="_blank" rel="noopener">${esc(t('au_terms_link'))}</a>`;
   let html = '';
   if (mode === 'welcome') {
-    html = `${langSwitch()}<img class="logo" src="icon-192.png" alt=""><h1>${esc(BRAND.toLocaleUpperCase(LANG))}</h1>
+    html = `${langSwitch()}<img class="wordmark" src="assets/logo.png" alt="${esc(BRAND)}">
       <p>${esc(t('au_intro'))}</p>
       <button class="green" data-a="register">${esc(t('create_account'))}</button>
       <button class="blue" data-a="login">${esc(t('login'))}</button>
