@@ -10,8 +10,13 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const require = createRequire('/Users/serdar/Desktop/Yeni klasör/Claude/package.json');
-const sharp = require('sharp');
+// sharp önce bu klasörde aranır (npm i sharp); yoksa SHARP_FROM ile başka bir projenin package.json yolu verilebilir.
+let sharp;
+try { sharp = createRequire(import.meta.url)('sharp'); }
+catch {
+  if (!process.env.SHARP_FROM) { console.error('sharp bulunamadı: "npm i sharp" çalıştırın ya da SHARP_FROM=<package.json yolu> verin.'); process.exit(1); }
+  sharp = createRequire(process.env.SHARP_FROM)('sharp');
+}
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const art = (p) => join(root, 'art', p);
