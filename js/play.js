@@ -39,7 +39,7 @@ function startLevel(node) {
     [lv.timeLimit > 0, 'timed', 'SÜRELİ BÖLÜM', `${lv.timeLimit} saniyede iğneleri sapla`],
     [lv.zones.some(z => z.type === 'bomb'), 'bomb', 'BOMBA', 'Patlayan iğne yanındaki iğneni de düşürür'],
     [lv.zones.some(z => z.type === 'shield'), 'shield', 'ZIRH', 'Metalden seken iğne kaybolur, küre ters döner'],
-    [lv.targets.some(x => x.kind === 'coin') && lv.kind !== 'bonus', 'coin', 'ALTIN PARA', 'Paraya iğne sapla: +5 altın'],
+    [lv.targets.some(x => x.kind === 'coin') && lv.kind !== 'bonus', 'coin', 'ALTIN PARA', 'Paraya iğne sapla: +2 altın'],
     [lv.zones.some(z => z.vel), 'drift', 'GEZEN ZIRH', 'Metal plakalar kendi başına kayıyor'],
     [lv.kind === 'bonus' && lv.btype === 'gold', 'bonus_gold', 'BONUS: ALTIN YAĞMURU', 'Paraları vur, altınları topla'],
     [lv.kind === 'bonus' && lv.btype === 'skill', 'bonus_skill', 'BONUS: HEDİYE KUTULARI', 'Kutuları vur, joker kazan'],
@@ -147,7 +147,7 @@ function finishLevel(timeUp) {
     const first = !P.bonus[lv.id];
     let gold = 0; const skills = {};
     if (first) {
-      gold = coinsRun + (lv.targets.every(x => x.taken) ? 10 : 0);
+      gold = coinsRun + (lv.targets.every(x => x.taken) ? 6 : 0);
       Object.assign(skills, giftsRun);
       P.bonus[lv.id] = true;
     }
@@ -166,9 +166,11 @@ function finishLevel(timeUp) {
     state = 'fail'; stateT = 0; flash = 0.6; sfx.fail();
     return;
   }
-  // ekonomi: bir joker (35–45 altın) için 3–4 bölüm biriktirmek gerekir
-  let gold = prev === 0 ? 4 + stars * 3 + (lv.boss ? 10 : 0) : stars > prev ? (stars - prev) * 3 : 1;
-  const leftover = stars === 3 ? pinsLeft : 0; gold += leftover; // 3 yıldızla erken bitince artan iğneler altına döner
+  // ekonomi: 1★ 3, 2★ 8, 3★ 12 altın; bir joker (90 altın) için 10–11 bölüm biriktirmek gerekir.
+  // Aynı bölümü tekrar oynamak yalnızca yıldız artarsa farkı verir (altın kasılmasın).
+  const STAR_GOLD = [0, 3, 8, 12];
+  let gold = stars > prev ? STAR_GOLD[stars] - STAR_GOLD[prev] : 0;
+  const leftover = 0;
   if (stars > prev) P.stars[lv.id] = stars;
   P.gold += gold;
   saveProgress();

@@ -30,7 +30,7 @@ const isTimed = (c, i) => i === 4 || i === 8;
 const timeLimit = (c) => Math.max(20, 32 - c * 2);
 const milestoneReq = (c) => Math.min(22, 14 + c);           // kısım içindeki 30 yıldızdan gereken
 const milestoneReward = (c) => {                             // mihenk taşı ödülü
-  const r = { gold: 30 + c * 10, slow: 1, pins2: 1, time15: 1 };
+  const r = { gold: 20 + c * 5, slow: 1, pins2: 1, time15: 1 };
   if (c % 3 === 0) { r.pins2 += 1; r.slow += 1; }
   return r;
 };
@@ -225,9 +225,9 @@ const BOSSES = [
   { name: 'KRİSTAL GÖLGE', aura: '#9b5cff' },
 ];
 const SKILL_INFO = {
-  slow: { name: 'Yavaşlat', desc: 'Küre 8 saniye yavaş döner', icon: 'sk_slow', price: 50 },
-  pins2: { name: '+2 İğne', desc: 'Bu bölümde 2 iğne fazla', icon: 'sk_pins2', price: 45 },
-  time15: { name: '+15 Saniye', desc: 'Süreli bölümde süreyi uzatır', icon: 'sk_time15', price: 40 },
+  slow: { name: 'Yavaşlat', desc: 'Küre 8 saniye yavaş döner', icon: 'sk_slow', price: 85 },
+  pins2: { name: '+2 İğne', desc: 'Bu bölümde 2 iğne fazla', icon: 'sk_pins2', price: 85 },
+  time15: { name: '+15 Saniye', desc: 'Süreli bölümde süreyi uzatır', icon: 'sk_time15', price: 85 },
 };
 
 // node → oynanabilir seviye tanımı (her cihazda aynı üretilir)
@@ -277,14 +277,14 @@ function makeLevel(node) {
   }
   for (const z of lv.zones) if (z.type === 'shield' && n >= 22) z.vel = (0.25 + rnd() * 0.35) * (rnd() < 0.5 ? -1 : 1);
 
-  // altın para hedefi (6+): vurursan +5 altın
+  // altın para hedefi (6+): vurursan +2 altın
   lv.targets = [];
   if (n >= 6 && rnd() < 0.7 && !boss) {
     for (let tr = 0; tr < 80; tr++) {
       const a = rnd() * TAU;
       const okZ = lv.zones.every(z => !inArc(a, { start: z.start - GAP * 1.5, width: z.width + GAP * 3 }));
       const okP = lv.pre.every(b => angDiff(a, b) > GAP * 2);
-      if (okZ && okP) { lv.targets.push({ a, kind: 'coin', value: 5, taken: false }); break; }
+      if (okZ && okP) { lv.targets.push({ a, kind: 'coin', value: 2, taken: false }); break; }
     }
   }
   if (boss) {
@@ -305,7 +305,7 @@ function makeBonus(node) {
   lv.zones = []; lv.pre = [];
   const count = node.btype === 'gold' ? 6 : 3, off = rnd() * TAU;
   lv.targets = Array.from({ length: count }, (_, k) => ({
-    a: norm(off + k * TAU / count), kind: node.btype === 'gold' ? 'coin' : 'gift', value: node.btype === 'gold' ? 4 : 0, taken: false,
+    a: norm(off + k * TAU / count), kind: node.btype === 'gold' ? 'coin' : 'gift', value: node.btype === 'gold' ? 2 : 0, taken: false,
   }));
   return lv;
 }

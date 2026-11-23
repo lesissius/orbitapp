@@ -307,8 +307,7 @@ function drawResult(th, m) {
     }
     y += 62;
     text(`Saplanan iğne: ${stuckCount} / ${lv.thresholds[2]}`, cx, y, m * 0.038, '#fff', 800); y += 34;
-    const parts = [`+${r.gold} altın`]; if (r.leftover) parts.push(`(${r.leftover} artan iğne)`);
-    text(parts.join(' '), cx, y, m * 0.04, '#ffd34d', 900); y += 30;
+    text(r.gold > 0 ? `+${r.gold} altın` : 'Altın yok: sadece yeni yıldız ödül verir', cx, y, m * (r.gold > 0 ? 0.04 : 0.032), r.gold > 0 ? '#ffd34d' : 'rgba(255,255,255,0.6)', r.gold > 0 ? 900 : 700); y += 30;
     if (r.coins) { text(`Toplanan para: +${r.coins}`, cx, y, m * 0.032, '#ffd34d', 700); y += 26; }
     if (r.stars < 3) text(`★★★ için ${lv.thresholds[r.stars]} iğne sapla`, cx, y + 4, m * 0.032, 'rgba(255,255,255,0.7)', 600);
     y += 30;
