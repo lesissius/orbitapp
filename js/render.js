@@ -5,10 +5,11 @@ const addButton = (x, y, w, h, action) => uiButtons.push({ x, y, w, h, action })
 const now = () => performance.now() / 1000;
 
 function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
-function text(str, x, y, size, color = '#fff', weight = 800, align = 'center', shadow = true) {
+function text(str, x, y, size, color = '#fff', weight = 800, align = 'center', shadow = true, maxW) {
   ctx.font = `${weight} ${Math.round(size)}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
   if (shadow) { ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 6; }
-  ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.shadowBlur = 0;
+  const lim = maxW || (align === 'center' ? W - 24 : align === 'left' ? W - x - 12 : x - 12);
+  ctx.fillStyle = color; ctx.fillText(str, x, y, Math.max(20, lim)); ctx.shadowBlur = 0;
 }
 function sprite(name, x, y, h, alpha = 1) { // ortalanmış, yüksekliğe göre ölçekli
   const im = IMG[name]; if (!im) return false;
@@ -32,7 +33,7 @@ function textButton(label, x, y, w, h, action, color = '#ffb84d', textColor = '#
   g.addColorStop(0, color); g.addColorStop(1, shade(color, -0.25));
   ctx.fillStyle = g; roundRect(x, y, w, h, h * 0.35); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; roundRect(x + 1, y + 1, w - 2, h - 2, h * 0.35); ctx.stroke();
-  text(label, x + w / 2, y + h / 2 + 1, Math.min(h * 0.42, 20), textColor, 900, 'center', false);
+  text(label, x + w / 2, y + h / 2 + 1, Math.min(h * 0.42, 20), textColor, 900, 'center', false, w - 12);
   ctx.restore();
   if (action && enabled) addButton(x, y, w, h, action);
 }
@@ -214,17 +215,17 @@ function drawPlayHud(th) {
   const active = state === 'play' || state === 'bossintro';
   // sol üst: bölüm
   text(lv.kind === 'bonus' ? `${lv.c}-BONUS` : lv.id, left, top + 12, m * 0.046, '#fff', 900, 'left');
-  text(boss ? BOSSES[boss.idx].name : lv.kind === 'bonus' ? 'Yıldız yok · ödül var' : chapterName(lv.c), left, top + 12 + m * 0.045, m * 0.03, boss ? BOSSES[boss.idx].aura : 'rgba(255,255,255,0.65)', 700, 'left');
+  text(boss ? BOSSES[boss.idx].name : lv.kind === 'bonus' ? t('no_stars_reward') : chapterName(lv.c), left, top + 12 + m * 0.045, m * 0.03, boss ? BOSSES[boss.idx].aura : 'rgba(255,255,255,0.65)', 700, 'left');
   // orta: ilerleme
   const bw = Math.min(W * 0.46, 260), bx = cx - bw / 2, by = top + 8;
   if (lv.kind !== 'bonus') drawProgressBar(bx, by, bw, 12);
-  else text(`Kalan hedef: ${lv.targets.filter(x => !x.taken).length}`, cx, by + 8, m * 0.038, '#ffd34d', 900);
+  else text(t('targets_left', { n: lv.targets.filter(x => !x.taken).length }), cx, by + 8, m * 0.038, '#ffd34d', 900);
   // süre
   if (lv.timeLimit) {
     const low = timeLeft <= 5, ts = m * (low ? 0.07 + 0.01 * Math.sin(now() * 12) : 0.06);
     text(`⏱ ${Math.ceil(timeLeft)}`, cx, by + 52, ts, low ? '#ff6b6b' : '#fff', 900);
   }
-  if (slowT > 0) text(`YAVAŞ ${Math.ceil(slowT)} sn`, cx, by + (lv.timeLimit ? 86 : 52), m * 0.034, '#8fd8ff', 900);
+  if (slowT > 0) text(t('slow_left', { n: Math.ceil(slowT) }), cx, by + (lv.timeLimit ? 86 : 52), m * 0.034, '#8fd8ff', 900);
   // sağ üst: altın ve duraklat
   if (active && !paused && !overlay) iconButton('ui_pause', right - 44, top - 4, 44, () => setPaused(true), '❚❚');
   coinPill(right, top + 50, 26, P.gold);
@@ -254,7 +255,7 @@ function drawPlayHud(th) {
     const k = (performance.now() / 900) % 1, hx = cx - R * 1.5, hy = LAUNCH_Y + L * 0.2 + Math.sin(k * TAU) * 8;
     ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hx, hy - R * 0.1, R * (0.15 + k * 0.5), 0, TAU); ctx.stroke();
     sprite('ui_hand', hx + R * 0.1, hy + R * 0.35, R * 0.9);
-    text('Ekrana dokun, iğne fırlasın', cx, H * 0.62, m * 0.045, '#fff', 800);
+    text(t('tap_hint'), cx, H * 0.62, m * 0.045, '#fff', 800);
   }
   // tanıtım kartı
   if (banner && state === 'play' && banner.t < 2.8 && !paused && !overlay) {
@@ -291,14 +292,14 @@ function drawResult(th, m) {
   let y = py + 44;
   const r = result;
   if (r.bonus) {
-    text('BONUS TAMAM', cx, y, m * 0.07, '#c89bff', 900); y += 60;
+    text(t('bonus_done'), cx, y, m * 0.07, '#c89bff', 900); y += 60;
     if (r.first) {
-      text(`+${r.gold} altın`, cx, y, m * 0.05, '#ffd34d', 900); y += 40;
+      text(t('gold_plus', { n: r.gold }), cx, y, m * 0.05, '#ffd34d', 900); y += 40;
       const sk = Object.entries(r.skills);
-      text(sk.length ? sk.map(([k, v]) => `${SKILL_INFO[k].name} ×${v}`).join(' · ') : 'Hediye kutusu vuramadın', cx, y, m * 0.036, '#7dff9a', 800); y += 50;
-    } else { text('Bu bonus daha önce alındı', cx, y, m * 0.038, 'rgba(255,255,255,0.7)', 700); y += 60; }
+      text(sk.length ? sk.map(([k, v]) => `${SKILL_INFO[k].name} ×${v}`).join(' · ') : t('no_gift'), cx, y, m * 0.036, '#7dff9a', 800); y += 50;
+    } else { text(t('bonus_already'), cx, y, m * 0.038, 'rgba(255,255,255,0.7)', 700); y += 60; }
   } else if (r.win) {
-    text(lv.boss ? 'BOSS YENİLDİ!' : r.stars === 3 ? 'KUSURSUZ!' : 'GEÇTİN!', cx, y, m * 0.07, th.accent, 900); y += 64;
+    text(lv.boss ? t('boss_beaten') : r.stars === 3 ? t('perfect') : t('passed'), cx, y, m * 0.07, th.accent, 900); y += 64;
     const pop = (i) => clamp((stateT - delay - 0.15 - i * 0.15) * 5, 0, 1);
     for (let i = 0; i < 3; i++) {
       const sx = cx + (i - 1) * m * 0.15, got = i < r.stars, s = m * (i === 1 ? 0.15 : 0.12) * (got ? 0.6 + 0.4 * pop(i) : 0.9);
@@ -306,25 +307,25 @@ function drawResult(th, m) {
       sprite('star', sx, y - (i === 1 ? 8 : 0), s); ctx.restore();
     }
     y += 62;
-    text(`Saplanan iğne: ${stuckCount} / ${lv.thresholds[2]}`, cx, y, m * 0.038, '#fff', 800); y += 34;
-    text(r.gold > 0 ? `+${r.gold} altın` : 'Altın yok: sadece yeni yıldız ödül verir', cx, y, m * (r.gold > 0 ? 0.04 : 0.032), r.gold > 0 ? '#ffd34d' : 'rgba(255,255,255,0.6)', r.gold > 0 ? 900 : 700); y += 30;
-    if (r.coins) { text(`Toplanan para: +${r.coins}`, cx, y, m * 0.032, '#ffd34d', 700); y += 26; }
-    if (r.stars < 3) text(`★★★ için ${lv.thresholds[r.stars]} iğne sapla`, cx, y + 4, m * 0.032, 'rgba(255,255,255,0.7)', 600);
+    text(t('stuck_of', { a: stuckCount, b: lv.thresholds[2] }), cx, y, m * 0.038, '#fff', 800); y += 34;
+    text(r.gold > 0 ? t('gold_plus', { n: r.gold }) : t('no_gold_replay'), cx, y, m * (r.gold > 0 ? 0.04 : 0.032), r.gold > 0 ? '#ffd34d' : 'rgba(255,255,255,0.6)', r.gold > 0 ? 900 : 700); y += 30;
+    if (r.coins) { text(t('coins_collected', { n: r.coins }), cx, y, m * 0.032, '#ffd34d', 700); y += 26; }
+    if (r.stars < 3) text(t('for3', { n: lv.thresholds[r.stars] }), cx, y + 4, m * 0.032, 'rgba(255,255,255,0.7)', 600);
     y += 30;
   } else {
-    text(r.reason === 'time' ? 'SÜRE DOLDU' : 'YETERSİZ İĞNE', cx, y, m * 0.068, '#ff6b81', 900); y += 56;
-    text(`Saplanan: ${r.got} · Geçmek için: ${r.need}`, cx, y, m * 0.04, '#fff', 800); y += 36;
-    text(r.reason === 'time' ? 'Süreli bölümde +15 Saniye jokeri işe yarar' : '+2 İğne jokeri bir sonraki denemede yardım eder', cx, y, m * 0.03, 'rgba(255,255,255,0.7)', 600); y += 30;
-    if (r.coins) { text(`Toplanan para korundu: +${r.coins}`, cx, y, m * 0.032, '#ffd34d', 700); }
+    text(r.reason === 'time' ? t('time_up') : t('not_enough'), cx, y, m * 0.068, '#ff6b81', 900); y += 56;
+    text(t('stuck_need', { a: r.got, b: r.need }), cx, y, m * 0.04, '#fff', 800); y += 36;
+    text(r.reason === 'time' ? t('tip_time') : t('tip_pins'), cx, y, m * 0.03, 'rgba(255,255,255,0.7)', 600); y += 30;
+    if (r.coins) { text(t('coins_kept', { n: r.coins }), cx, y, m * 0.032, '#ffd34d', 700); }
     y += 40;
   }
   // düğmeler
   const bh = 50, gap = 10, bw3 = (pw - 40 - gap * 2) / 3, by = py + ph - bh - 22;
   const nxt = !r.bonus && r.win ? nextNodeAfter(lv.id) : null;
   const canNext = r.win && (r.bonus || (nxt && nodeUnlocked(nxt)));
-  textButton('Harita', px + 20, by, bw3, bh, () => goMap(), '#7aa7ff', '#0d1430');
-  textButton('Tekrar', px + 20 + bw3 + gap, by, bw3, bh, () => startLevel(curNode), '#ffb84d', '#1a1030', !(r.bonus));
-  textButton(canNext ? 'Sonraki' : 'Market', px + 20 + (bw3 + gap) * 2, by, bw3, bh, () => {
+  textButton(t('map'), px + 20, by, bw3, bh, () => goMap(), '#7aa7ff', '#0d1430');
+  textButton(t('retry'), px + 20 + bw3 + gap, by, bw3, bh, () => startLevel(curNode), '#ffb84d', '#1a1030', !(r.bonus));
+  textButton(canNext ? t('next') : t('market_btn'), px + 20 + (bw3 + gap) * 2, by, bw3, bh, () => {
     if (canNext) { if (r.bonus) goMap(); else if (nxt.kind === 'milestone') { goMap(); openMilestone(nxt.c); } else startLevel(nxt); }
     else openMarket();
   }, canNext ? '#58d68d' : '#c89bff', '#0b2015');
@@ -336,33 +337,33 @@ function drawPauseMenu(m) {
   ctx.fillStyle = 'rgba(6,4,16,0.88)'; ctx.fillRect(0, 0, W, H);
   const pw = Math.min(W - 32, 420), px = cx - pw / 2;
   let y = Math.max(SAFE.top + 50, H * 0.14);
-  text('DURAKLATILDI', cx, y, m * 0.08, '#fff', 900); y += m * 0.06;
-  text(`${lv.kind === 'bonus' ? lv.c + '-BONUS' : lv.id} · ${stuckCount} iğne saplandı · ${pinsLeft} iğne kaldı`, cx, y, m * 0.032, 'rgba(255,255,255,0.65)', 700); y += m * 0.06;
+  text(t('paused'), cx, y, m * 0.08, '#fff', 900); y += m * 0.06;
+  text(t('pause_status', { id: lv.kind === 'bonus' ? lv.c + '-BONUS' : lv.id, a: stuckCount, b: pinsLeft }), cx, y, m * 0.032, 'rgba(255,255,255,0.65)', 700); y += m * 0.06;
   // dört seçenek: devam, baştan, harita, ana sayfa
   const items = [
-    ['ui_play', 'Devam', () => setPaused(false), '▶'],
-    ['ui_restart', 'Baştan', () => startLevel(curNode), '↻'],
-    ['map', 'Harita', () => goMap(), 'H'],
-    ['ui_home', 'Ana sayfa', () => goHome(), '⌂'],
+    ['ui_play', t('resume'), () => setPaused(false), '▶'],
+    ['ui_restart', t('restart'), () => startLevel(curNode), '↻'],
+    ['map', t('map'), () => goMap(), 'H'],
+    ['ui_home', t('home'), () => goHome(), '⌂'],
   ];
   const gap = 14, bb = Math.min(m * 0.17, (pw - gap * 3) / 4);
   const x0 = cx - (bb * 4 + gap * 3) / 2;
   items.forEach(([icon, label, fn, fb], i) => {
     const x = x0 + i * (bb + gap);
     iconButton(icon, x, y, bb, fn, fb);
-    text(label, x + bb / 2, y + bb + 16, m * 0.032, 'rgba(255,255,255,0.85)', 700);
+    text(label, x + bb / 2, y + bb + 16, m * 0.032, 'rgba(255,255,255,0.85)', 700, 'center', true, bb + gap - 2);
   });
   y += bb + 60;
   drawToggles(px, y, pw, m);
 }
 function drawToggles(px, y, pw, m) {
-  const toggles = [['ui_music', 'Müzik', 'music'], ['sound', 'Ses', 'sound'], ['ui_vibe', 'Titreşim', 'vibe'], ['ui_shake', 'Sarsıntı', 'shake']];
+  const toggles = [['ui_music', t('music'), 'music'], ['sound', t('sound'), 'sound'], ['ui_vibe', t('vibe'), 'vibe'], ['ui_shake', t('shake'), 'shake']];
   const ts = Math.min(m * 0.14, 64), tg = (pw - ts * 4) / 3;
   toggles.forEach(([icon, label, key], i) => {
     const x = px + i * (ts + tg);
     iconButton(icon, x, y, ts, () => { settings[key] = !settings[key]; saveSettings(); if (key === 'vibe' && settings.vibe) vibrate(30); }, label[0], !settings[key]);
     if (!settings[key]) { ctx.strokeStyle = '#ff6b81'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + ts * 0.18, y + ts * 0.82); ctx.lineTo(x + ts * 0.82, y + ts * 0.18); ctx.stroke(); }
-    text(label, x + ts / 2, y + ts + 14, m * 0.03, settings[key] ? '#fff' : 'rgba(255,255,255,0.45)', 700);
+    text(label, x + ts / 2, y + ts + 14, m * 0.03, settings[key] ? '#fff' : 'rgba(255,255,255,0.45)', 700, 'center', true, ts + tg - 4);
   });
   return ts + 40;
 }

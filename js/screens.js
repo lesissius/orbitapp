@@ -39,20 +39,24 @@ function drawTitle() {
   const orb = IMG.orb1;
   for (let k = 0; k < 4; k++) { const wa = rot + k * TAU / 4 + 0.3; drawPin(cx + Math.cos(wa) * R * 0.9, cy + Math.sin(wa) * R * 0.9, wa, L + R * 0.1); }
   if (orb) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.drawImage(orb, -R, -R, R * 2, R * 2); ctx.restore(); }
-  text('İĞNE USTASI', cx, H * 0.64, m * 0.1, '#fff', 900);
+  text(BRAND.toLocaleUpperCase(LANG), cx, H * 0.64, m * 0.1, '#fff', 900);
   ctx.globalAlpha = 0.6 + 0.35 * Math.sin(performance.now() / 300);
-  text('Başlamak için dokun', cx, H * 0.72, m * 0.045, '#fff', 700);
+  text(t('tap_start'), cx, H * 0.72, m * 0.045, '#fff', 700);
   ctx.globalAlpha = 1;
-  text('İğneleri dönen küreye sapla.', cx, H * 0.79, m * 0.034, 'rgba(255,255,255,0.65)', 500);
-  text('Ne kadar çok iğne, o kadar çok yıldız.', cx, H * 0.79 + m * 0.05, m * 0.034, 'rgba(255,255,255,0.65)', 500);
+  text(t('title_l1'), cx, H * 0.79, m * 0.034, 'rgba(255,255,255,0.65)', 500);
+  text(t('title_l2'), cx, H * 0.79 + m * 0.05, m * 0.034, 'rgba(255,255,255,0.65)', 500);
   if (totalStars() > 0) {
     const ty = Math.min(H * 0.9, H - SAFE.bottom - m * 0.06);
     sprite('ui_trophy', cx - m * 0.17, ty, m * 0.08);
-    text(`★ ${totalStars()}   ·   Kısım ${maxOpenChapter()}`, cx + m * 0.03, ty, m * 0.04, '#ffd34d', 900);
+    text(`★ ${totalStars()}   ·   ${t('chapter_n', { n: maxOpenChapter() })}`, cx + m * 0.03, ty, m * 0.04, '#ffd34d', 900);
   }
-  if (ACCOUNT) text(ACCOUNT.guest ? 'Misafir olarak oynuyorsun' : `Hoş geldin, ${ACCOUNT.username}`, cx, SAFE.top + 40, m * 0.038, 'rgba(255,255,255,0.85)', 800);
+  if (ACCOUNT) text(ACCOUNT.guest ? t('playing_guest') : t('welcome_user', { name: ACCOUNT.username }), cx, SAFE.top + 40, m * 0.038, 'rgba(255,255,255,0.85)', 800);
   const enter = () => { screen = 'map'; viewChapter = maxOpenChapter(); scrollToCurrent(); musicUpdate(); };
   addButton(0, 0, W, H, () => { audio(); if (ACCOUNT) enter(); else showAuth('welcome', { after: enter }); });
+  // dil düğmesi (sağ üst): Türkçe ↔ English
+  const next = LANGS[(LANGS.findIndex((l) => l.code === LANG) + 1) % LANGS.length];
+  const lw = 104, lx = W - SAFE.right - lw - 14, ly = SAFE.top + 64;
+  textButton('🌐 ' + LANGS.find((l) => l.code === LANG).name, lx, ly, lw, 34, () => setLang(next.code), '#3a3360', '#fff');
 }
 
 // ---------- harita ----------
@@ -96,7 +100,7 @@ function drawMap() {
       sprite('milestone', p.x, p.y - 6, bh * 1.15, unlocked || claimed ? 1 : 0.6);
       if (ready || (!claimed && unlocked)) sprite('chest', p.x + bh * 0.48, p.y + bh * 0.2, bh * 0.45);
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(p.x - 62, p.y + bh * 0.5, 124, 26, 13); ctx.fill();
-      text(claimed ? '✓ Geçildi' : `★ ${have} / ${req}`, p.x, p.y + bh * 0.5 + 14, 15, claimed ? '#7dff9a' : have >= req ? '#ffd34d' : '#fff', 900, 'center', false);
+      text(claimed ? t('ms_passed') : `★ ${have} / ${req}`, p.x, p.y + bh * 0.5 + 14, 15, claimed ? '#7dff9a' : have >= req ? '#ffd34d' : '#fff', 900, 'center', false);
       if (p.y > mapHeaderH()) addButton(p.x - bh * 0.6, p.y - bh * 0.6, bh * 1.2, bh * 1.3, () => openMilestone(c));
       return;
     }
@@ -115,16 +119,16 @@ function drawMap() {
       text(label, p.x, p.y + bob - size * 0.05 + 10, 13, '#fff', 900, 'center', false);
     }
     if (nd.kind !== 'bonus' && unlocked) drawStars(p.x, p.y + size * 0.42, size * 0.2, st);
-    if (nd.kind === 'bonus' && done) text('✓ Alındı', p.x, p.y + size * 0.42, 13, '#7dff9a', 900);
+    if (nd.kind === 'bonus' && done) text(t('bonus_taken'), p.x, p.y + size * 0.42, 13, '#7dff9a', 900);
     if (isCur) { // zıplayan ok
       const ay = p.y - size * 0.75 + Math.sin(tnow * 6) * 6;
       ctx.fillStyle = '#ffd34d'; ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(p.x - 12, ay - 12); ctx.lineTo(p.x + 12, ay - 12); ctx.lineTo(p.x, ay + 4); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
     if (p.y > mapHeaderH()) addButton(p.x - size * 0.45, p.y - size * 0.6, size * 0.9, size * 1.15, () => {
-      if (!open) { showToast(`Önce Kısım ${c - 1} mihenk taşını geç`); return; }
-      if (!unlocked) { showToast(nd.kind === 'bonus' ? `Bonus için ${c}-5'i geç` : 'Önce önceki bölümü geç'); return; }
-      if (nd.kind === 'bonus' && P.bonus[nd.id]) { showToast('Bu bonus alındı'); return; }
+      if (!open) { showToast(t('need_ms', { n: c - 1 })); return; }
+      if (!unlocked) { showToast(nd.kind === 'bonus' ? t('need_bonus', { id: `${c}-5` }) : t('need_prev')); return; }
+      if (nd.kind === 'bonus' && P.bonus[nd.id]) { showToast(t('bonus_done_toast')); return; }
       startLevel(nd);
     });
   });
@@ -132,8 +136,8 @@ function drawMap() {
   if (!open) {
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
     sprite('lock', cx, H * 0.45, m * 0.22);
-    text(`Kısım ${c} kilitli`, cx, H * 0.45 + m * 0.18, m * 0.06, '#fff', 900);
-    text(`Kısım ${c - 1} mihenk taşında ★ ${milestoneReq(c - 1)} gerekli`, cx, H * 0.45 + m * 0.25, m * 0.036, 'rgba(255,255,255,0.8)', 700);
+    text(t('chapter_locked', { n: c }), cx, H * 0.45 + m * 0.18, m * 0.06, '#fff', 900);
+    text(t('chapter_locked_req', { p: c - 1, req: milestoneReq(c - 1) }), cx, H * 0.45 + m * 0.25, m * 0.036, 'rgba(255,255,255,0.8)', 700);
   }
 
   // üst bar
@@ -155,7 +159,7 @@ function drawMap() {
   const ny = top + 64;
   iconButton(null, left, ny - 18, 36, c > 1 ? () => { viewChapter--; scrollToCurrent(); } : null, '‹', c <= 1);
   iconButton(null, right - 36, ny - 18, 36, c <= maxOpenChapter() ? () => { viewChapter++; scrollToCurrent(); } : null, '›', c > maxOpenChapter());
-  text(`KISIM ${c}`, cx, ny - 8, m * 0.05, '#fff', 900);
+  text(t('chapter_caps', { n: c }), cx, ny - 8, m * 0.05, '#fff', 900);
   text(`${chapterName(c)}  ·  ★ ${chapterStars(c)} / 30`, cx, ny + 16, m * 0.032, '#ffd34d', 800);
 
   // alt: jokerler
@@ -188,7 +192,7 @@ function drawMarket(m) {
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   closeX(px, py, pw);
   sprite('shop', px + 40, py + 34, 46);
-  text('MARKET', px + 74, py + 34, m * 0.06, '#fff', 900, 'left');
+  text(t('market'), px + 74, py + 34, m * 0.06, '#fff', 900, 'left');
   coinPill(px + pw - 56, py + 20, 30, P.gold);
   let y = py + 74;
   const rowH = clamp((ph - 300) / 3, 64, 82);
@@ -206,9 +210,9 @@ function drawMarket(m) {
     y += rowH;
   }
   y += 6;
-  text('ALTIN PAKETLERİ', px + 20, y + 10, 15, '#ffd34d', 900, 'left'); y += 28;
+  text(t('gold_packs'), px + 20, y + 10, 15, '#ffd34d', 900, 'left'); y += 28;
   // Gerçek para ödemesi bağlanana kadar fiyat gösterilmez (satış yokken fiyat göstermek yanıltıcı olur)
-  const packs = [['pack_s', 500, 'Yakında'], ['pack_m', 1500, 'Yakında'], ['pack_l', 4000, 'Yakında']];
+  const packs = [['pack_s', 500, t('soon')], ['pack_m', 1500, t('soon')], ['pack_l', 4000, t('soon')]];
   const cw = (pw - 24 - 16) / 3;
   packs.forEach(([icon, amount, price], i) => {
     const x = px + 12 + i * (cw + 8);
@@ -217,61 +221,66 @@ function drawMarket(m) {
     text(`${amount}`, x + cw / 2, y + 74, 17, '#ffd34d', 900, 'center', false);
     textButton(price, x + 8, y + 90, cw - 16, 30, () => {
       if (guestBlocked()) return;
-      showToast('Altın paketleri, oyun uygulama mağazasına çıkınca açılacak');
+      showToast(t('packs_soon'));
     }, '#7aa7ff', '#0d1430');
   });
   y += 136;
   if (ACCOUNT && ACCOUNT.guest) {
-    text('Misafir hesapla satın alma yapılamaz.', cx, y + 4, 12, '#ffd34d', 800);
-    text('Hesap oluştur, ilerlemen aynen aktarılır.', cx, y + 22, 12, '#ffd34d', 700);
+    text(t('guest_no_buy1'), cx, y + 4, 12, '#ffd34d', 800);
+    text(t('guest_no_buy2'), cx, y + 22, 12, '#ffd34d', 700);
   }
-  else text('Altın paketleri, oyun uygulama mağazasına çıkınca açılacak.', cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
+  else text(t('packs_soon'), cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
 }
 // Misafirler satın alma yapamaz: hesap oluşturma ekranı açılır
 function guestBlocked() {
   if (!ACCOUNT || !ACCOUNT.guest) return false;
-  showAuth('register', { reason: 'Satın alma için hesap gerekli. Misafir ilerlemen, altınların ve jokerlerin hesabına aktarılır.' });
+  showAuth('register', { reasonKey: 'reason_buy' });
   return true;
 }
 function buySkill(k, n, price) {
   if (guestBlocked()) return;
-  if (P.gold < price) { showToast('Yeterli altın yok'); return; }
+  if (P.gold < price) { showToast(t('not_enough_gold')); return; }
   P.gold -= price; P.skills[k] = (P.skills[k] || 0) + n; saveProgress();
-  sfx.coin(); showToast(`${SKILL_INFO[k].name} ×${n} alındı`);
+  sfx.coin(); showToast(t('bought', { name: SKILL_INFO[k].name, n }));
 }
 
 function drawSettings(m) {
   const guest = !ACCOUNT || ACCOUNT.guest;
-  const pw = Math.min(W - 32, 400), ph = guest ? 446 : 372, px = cx - pw / 2, py = Math.max(SAFE.top + 16, (H - ph) / 2);
+  const pw = Math.min(W - 32, 400), ph = guest ? 496 : 422, px = cx - pw / 2, py = Math.max(SAFE.top + 16, (H - ph) / 2);
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   closeX(px, py, pw);
-  text('AYARLAR', cx, py + 36, m * 0.06, '#fff', 900);
+  text(t('settings'), cx, py + 36, m * 0.06, '#fff', 900);
   drawToggles(px + 24, py + 76, pw - 48, m);
   ctx.globalAlpha = 1;
   // hesap
-  let y = py + 196;
+  // dil seçimi
+  let y = py + 192;
+  text(t('language'), px + 24, y + 16, 14, 'rgba(255,255,255,0.7)', 800, 'left', false);
+  const lw = (pw - 130) / LANGS.length;
+  LANGS.forEach((l, i) => textButton(l.name, px + 112 + i * lw, y, lw - 8, 34, () => setLang(l.code), l.code === LANG ? '#ffb84d' : '#3a3360', l.code === LANG ? '#1a1030' : '#fff'));
+  y += 50;
   ctx.fillStyle = 'rgba(255,255,255,0.07)'; roundRect(px + 16, y, pw - 32, 56, 14); ctx.fill();
-  text(guest ? 'Misafir hesap' : ACCOUNT.username, px + 30, y + 20, 17, '#fff', 900, 'left', false);
-  const sync = !ACCOUNT ? '' : ACCOUNT.offline || syncState === 'offline' ? 'Çevrimdışı · bağlanınca kaydedilecek' : syncState === 'error' ? 'Kaydedilemedi' : syncState === 'saving' ? 'Kaydediliyor…' : 'İlerleme bulutta kayıtlı';
+  text(guest ? t('guest_account') : ACCOUNT.username, px + 30, y + 20, 17, '#fff', 900, 'left', false);
+  const sync = !ACCOUNT ? '' : ACCOUNT.offline || syncState === 'offline' ? t('sync_offline') : syncState === 'error' ? t('sync_error') : syncState === 'saving' ? t('sync_saving') : t('sync_ok');
   text(sync, px + 30, y + 40, 12, syncState === 'error' ? '#ff8da1' : 'rgba(255,255,255,0.6)', 600, 'left', false);
   y += 68;
   const bw = (pw - 42) / 2;
   if (guest) {
-    textButton('Hesap oluştur', px + 16, y, bw, 46, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
-    textButton('Giriş yap', px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('login'); }, '#7aa7ff', '#0d1430');
+    textButton(t('create_account'), px + 16, y, bw, 46, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
+    textButton(t('login'), px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('login'); }, '#7aa7ff', '#0d1430');
   } else {
-    textButton('Çıkış yap', px + 16, y, bw, 46, async () => { overlay = null; await logout(); afterSignOut('Çıkış yapıldı'); }, '#7aa7ff', '#0d1430');
-    textButton('Hesabı sil', px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('delete'); }, '#ff8f9f', '#2a0710');
+    textButton(t('logout'), px + 16, y, bw, 46, async () => { overlay = null; await logout(); afterSignOut(t('logged_out')); }, '#7aa7ff', '#0d1430');
+    textButton(t('delete_account'), px + 26 + bw, y, bw, 46, () => { overlay = null; showAuth('delete'); }, '#ff8f9f', '#2a0710');
   }
   y += 58;
   if (guest) {
-    text('Misafirken satın alma yapılamaz. Hesap oluşturursan ilerlemen aktarılır.', cx, y + 10, 11, 'rgba(255,255,255,0.55)', 600);
-    text('Misafir hesabını sil', cx, y + 40, 13, 'rgba(255,141,161,0.8)', 700);
+    text(t('guest_settings_note'), cx, y + 10, 11, 'rgba(255,255,255,0.55)', 600);
+    text(t('delete_guest'), cx, y + 40, 13, 'rgba(255,141,161,0.8)', 700);
     addButton(px + 40, y + 26, pw - 80, 30, () => { overlay = null; showAuth('delete'); });
     y += 56;
   }
-  text('Gizlilik politikası ve şartlar', cx, y + 8, 13, '#ffd34d', 700);
-  addButton(px + 40, y - 8, pw - 80, 32, () => { window.open('privacy.html', '_blank', 'noopener'); });
+  text(t('privacy_link'), cx, y + 8, 13, '#ffd34d', 700);
+  addButton(px + 40, y - 8, pw - 80, 32, () => { window.open(privacyUrl(), '_blank', 'noopener'); });
 }
 
 // Misafire hatırlatma: ilerlemesini kaybetmesin diye günde en fazla bir kez hesap oluşturmayı önerir
@@ -286,13 +295,13 @@ function drawRemind(m) {
   const pw = Math.min(W - 32, 380), ph = 300, px = cx - pw / 2, py = (H - ph) / 2;
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   sprite('chest', cx, py + 62, 70);
-  text('İlerlemeni koru', cx, py + 120, m * 0.058, '#ffd34d', 900);
-  text(`★ ${totalStars()} yıldız ve ${P.gold} altının misafir hesabında.`, cx, py + 154, 13, '#fff', 700);
-  text('Telefon değişirse ya da oyun silinirse kaybolabilir.', cx, py + 174, 13, 'rgba(255,255,255,0.75)', 600);
-  text('Hesap oluştur, hepsi aynen aktarılsın.', cx, py + 194, 13, 'rgba(255,255,255,0.75)', 600);
+  text(t('remind_title'), cx, py + 120, m * 0.058, '#ffd34d', 900);
+  text(t('remind_l1', { stars: totalStars(), gold: P.gold }), cx, py + 154, 13, '#fff', 700);
+  text(t('remind_l2'), cx, py + 174, 13, 'rgba(255,255,255,0.75)', 600);
+  text(t('remind_l3'), cx, py + 194, 13, 'rgba(255,255,255,0.75)', 600);
   const bw = (pw - 42) / 2;
-  textButton('Sonra', px + 16, py + ph - 66, bw, 48, () => closeOverlay(), '#7aa7ff', '#0d1430');
-  textButton('Hesap oluştur', px + 26 + bw, py + ph - 66, bw, 48, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
+  textButton(t('later'), px + 16, py + ph - 66, bw, 48, () => closeOverlay(), '#7aa7ff', '#0d1430');
+  textButton(t('create_account'), px + 26 + bw, py + ph - 66, bw, 48, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
 }
 
 function drawMilestone(m) {
@@ -301,23 +310,23 @@ function drawMilestone(m) {
   const pw = Math.min(W - 32, 400), ph = 420, px = cx - pw / 2, py = (H - ph) / 2;
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   closeX(px, py, pw);
-  text('MİHENK TAŞI', cx, py + 36, m * 0.06, '#ffd34d', 900);
-  text(`Kısım ${c} · ${chapterName(c)}`, cx, py + 66, 14, 'rgba(255,255,255,0.7)', 700);
+  text(t('milestone'), cx, py + 36, m * 0.06, '#ffd34d', 900);
+  text(t('ms_sub', { n: c, name: chapterName(c) }), cx, py + 66, 14, 'rgba(255,255,255,0.7)', 700);
   sprite('milestone', cx, py + 128, 96);
   text(`★ ${have} / ${req}`, cx, py + 196, m * 0.06, have >= req ? '#7dff9a' : '#fff', 900);
-  text(claimed ? 'Bu mihenk taşı geçildi' : !reached ? `Önce ${c}-10 boss bölümünü geç` : have >= req ? 'Yıldızlar yeterli!' : `${req - have} yıldız eksik: önceki bölümleri tekrar oyna`, cx, py + 230, 14, 'rgba(255,255,255,0.8)', 700);
+  text(claimed ? t('ms_claimed') : !reached ? t('ms_need_boss', { id: `${c}-10` }) : have >= req ? t('ms_enough') : t('ms_missing', { n: req - have }), cx, py + 230, 14, 'rgba(255,255,255,0.8)', 700);
   const r = milestoneReward(c);
   const items = [['coin', `+${r.gold}`], ['sk_slow', `×${r.slow}`], ['sk_pins2', `×${r.pins2}`], ['sk_time15', `×${r.time15}`]];
   const iw = (pw - 40) / items.length;
-  text('Ödül', cx, py + 262, 13, 'rgba(255,255,255,0.55)', 700);
+  text(t('reward'), cx, py + 262, 13, 'rgba(255,255,255,0.55)', 700);
   items.forEach(([icon, label], i) => {
     const x = px + 20 + iw * (i + 0.5);
     sprite(icon, x, py + 298, 40, claimed ? 0.4 : 1);
     text(label, x, py + 330, 15, '#fff', 900);
   });
-  if (ready) textButton('Ödülü al ve ilerle', px + 30, py + ph - 66, pw - 60, 48, () => claimMilestone(c), '#58d68d', '#0b2015');
-  else if (claimed) textButton(`Kısım ${c + 1}'e git`, px + 30, py + ph - 66, pw - 60, 48, () => { viewChapter = c + 1; closeOverlay(); scrollToCurrent(); }, '#7aa7ff', '#0d1430');
-  else textButton('Tamam', px + 30, py + ph - 66, pw - 60, 48, () => closeOverlay(), '#ffb84d');
+  if (ready) textButton(t('claim'), px + 30, py + ph - 66, pw - 60, 48, () => claimMilestone(c), '#58d68d', '#0b2015');
+  else if (claimed) textButton(t('go_chapter', { n: c + 1 }), px + 30, py + ph - 66, pw - 60, 48, () => { viewChapter = c + 1; closeOverlay(); scrollToCurrent(); }, '#7aa7ff', '#0d1430');
+  else textButton(t('ok'), px + 30, py + ph - 66, pw - 60, 48, () => closeOverlay(), '#ffb84d');
 }
 function claimMilestone(c) {
   const r = milestoneReward(c);
@@ -325,7 +334,7 @@ function claimMilestone(c) {
   for (const k of ['slow', 'pins2', 'time15']) P.skills[k] = (P.skills[k] || 0) + (r[k] || 0);
   saveProgress(); sfx.win();
   overlay = null; viewChapter = c + 1; scrollToCurrent();
-  showToast(`Kısım ${c + 1} açıldı! Ödüller eklendi`);
+  showToast(t('chapter_unlocked', { n: c + 1 }));
 }
 
 function drawToast() {

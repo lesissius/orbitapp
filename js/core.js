@@ -221,8 +221,7 @@ const THEMES = [
   { bg: ['#10183a', '#05081c'], orb: ['#8ab4ff', '#4a5bff'], pin: '#eef3ff', accent: '#8ab4ff' },
   { bg: ['#2a1012', '#100506'], orb: ['#ff6b6b', '#b8202e'], pin: '#fff0f0', accent: '#ff7b7b' },
 ];
-const CHAPTER_NAMES = ['Amber Vadisi', 'Turkuaz Koy', 'Pembe Bulutlar', 'Yeşil Orman', 'Mavi Gece', 'Kızıl Zirve'];
-const chapterName = (c) => CHAPTER_NAMES[(c - 1) % CHAPTER_NAMES.length];
+const chapterName = (c) => t('ch' + ((c - 1) % 6 + 1));
 let viewChapter = 1; // haritada bakılan kısım
 const themeIndex = () => ((screen === 'play' && lv ? lv.c : viewChapter) - 1) % THEMES.length;
 const theme = () => THEMES[themeIndex()];
@@ -249,14 +248,14 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---------- seviye üretimi ----------
 const BOSSES = [
-  { name: 'LAV GOLEMİ', aura: '#ff6a1a' },
-  { name: 'DEMİR GÖZ', aura: '#ff2a3a' },
-  { name: 'KRİSTAL GÖLGE', aura: '#9b5cff' },
+  { get name() { return t('boss1'); }, aura: '#ff6a1a' },
+  { get name() { return t('boss2'); }, aura: '#ff2a3a' },
+  { get name() { return t('boss3'); }, aura: '#9b5cff' },
 ];
 const SKILL_INFO = {
-  slow: { name: 'Yavaşlat', desc: 'Küre 8 saniye yavaş döner', icon: 'sk_slow', price: 85 },
-  pins2: { name: '+2 İğne', desc: 'Bu bölümde 2 iğne fazla', icon: 'sk_pins2', price: 85 },
-  time15: { name: '+15 Saniye', desc: 'Süreli bölümde süreyi uzatır', icon: 'sk_time15', price: 85 },
+  slow: { get name() { return t('sk_slow'); }, get desc() { return t('sk_slow_d'); }, icon: 'sk_slow', price: 85 },
+  pins2: { get name() { return t('sk_pins2'); }, get desc() { return t('sk_pins2_d'); }, icon: 'sk_pins2', price: 85 },
+  time15: { get name() { return t('sk_time15'); }, get desc() { return t('sk_time15_d'); }, icon: 'sk_time15', price: 85 },
 };
 
 // node → oynanabilir seviye tanımı (her cihazda aynı üretilir)

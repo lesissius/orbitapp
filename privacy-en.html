@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#14112b">
+<title>Privacy and Terms</title>
+<style>
+  body{margin:0;background:#14112b;color:#eee;font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:720px;margin:0 auto;padding:24px 16px calc(40px + env(safe-area-inset-bottom))}
+  h1{font-size:26px;margin:8px 0 4px}
+  h2{font-size:19px;margin:28px 0 8px;color:#ffd34d}
+  p,li{color:rgba(255,255,255,.85)}
+  ul{padding-left:20px}
+  a{color:#ffd34d}
+  .muted{color:rgba(255,255,255,.55);font-size:14px}
+  .back{display:inline-block;margin-bottom:12px;margin-right:14px}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">← Back to the game</a><a class="back" href="privacy.html">Türkçe</a>
+<h1>Privacy Policy and Terms of Use</h1>
+<p class="muted">Last updated: 23 November 2026</p>
+
+<h2>In short</h2>
+<p>The game keeps only the minimum data needed to run and to save your progress. It does not ask for your email, phone number, full name, location or contacts. It uses no ads and no third-party tracking. Your data is not sold or shared.</p>
+
+<h2>What data is kept?</h2>
+<ul>
+  <li><b>Username:</b> the name you choose if you create an account. Guest accounts have no username.</li>
+  <li><b>Password:</b> never stored in plain form. Only a one-way hash (PBKDF2-SHA256 with a random salt) is kept.</li>
+  <li><b>Game progress:</b> level stars, gold, boosters, milestones and which in-game tips you have seen.</li>
+  <li><b>Session:</b> when you log in, your device receives a session key. The server stores only a hash of it. Sessions end automatically after 180 days.</li>
+  <li><b>Abuse prevention:</b> to limit repeated failed logins or account creation, a salted one-way hash of your IP address is kept for at most 2 days. The IP address itself is not stored.</li>
+  <li><b>On your device:</b> the game keeps your progress and session key in your browser's storage so it can work offline.</li>
+</ul>
+
+<h2>Where and for how long?</h2>
+<ul>
+  <li>The game page runs on GitHub Pages and the account server on Cloudflare. These services may briefly process technical data such as IP addresses to run and protect their systems, under their own policies.</li>
+  <li>Your account is kept until you delete it.</li>
+  <li>Guest accounts not used for 120 days are deleted automatically.</li>
+</ul>
+
+<h2>Deleting your account</h2>
+<p>In the game, go to <b>Settings → Delete account</b> to permanently delete your account, progress and sessions. Registered accounts must confirm with their password. Deleted accounts cannot be restored.</p>
+
+<h2>Purchases</h2>
+<p>There are currently no real-money purchases in the game. Gold and boosters are earned in the game and bought with in-game gold only; they have no real-money value. This text will be updated if real-money purchases are added.</p>
+
+<h2>Children</h2>
+<p>The game does not ask for personal contact information. Children under 13 are advised to create an account with a parent or guardian.</p>
+
+<h2>Terms of use</h2>
+<ul>
+  <li><b>Fair play:</b> bypassing the rules of the game or the server, editing progress or gold, or exploiting bugs is not allowed. The server rejects progress it cannot verify. Cheating accounts may be reset or deleted without notice.</li>
+  <li><b>Usernames:</b> names that are offensive, hateful, or impersonate game staff are not allowed and may be changed or closed.</li>
+  <li><b>Don't overload the system:</b> flooding the server, creating accounts automatically, or trying to access other people's accounts is not allowed.</li>
+  <li><b>Account security:</b> you are responsible for keeping your password secret. Please don't reuse a password from another service.</li>
+  <li><b>Service:</b> the game is provided as is and may sometimes be unavailable due to maintenance, updates or technical problems.</li>
+</ul>
+
+<h2>Contact and your rights</h2>
+<p>For questions, corrections or deletion requests about your data, reach us through the <a href="https://github.com/lesissius/igne-ustasi/issues" rel="noopener">"Issues" section of the game's GitHub page</a>. Please don't post your password or personal information there.</p>
+</main>
+</body>
+</html>

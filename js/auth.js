@@ -34,6 +34,9 @@ authStyle.textContent = `
 #auth label.chk input{width:20px;height:20px;flex:none;margin:0;accent-color:#ffb84d}
 #auth a{color:#ffd34d}
 #auth .legal{font-size:12px;color:rgba(255,255,255,.5);text-align:center;margin-top:10px}
+#auth .langs{display:flex;gap:6px;justify-content:center;margin:-6px 0 12px}
+#auth button.lang{width:auto;margin:0;padding:6px 12px;font-size:13px;font-weight:800;border-radius:10px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.75);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
+#auth button.lang.on{background:#ffb84d;color:#1a1030}
 #auth .logo{display:block;width:84px;height:84px;margin:0 auto 8px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
 `;
 document.head.appendChild(authStyle);
@@ -48,48 +51,56 @@ function authDone() {
 }
 
 // mode: 'welcome' | 'register' | 'login' | 'delete'
+// opts.reasonKey: üstte gösterilecek açıklamanın dil anahtarı
+let authState = null; // dil değişince aynı pencere yeniden çizilir
+function langSwitch() {
+  return `<div class="langs">${LANGS.map((l) => `<button type="button" class="lang${l.code === LANG ? ' on' : ''}" data-lang="${l.code}">${l.name}</button>`).join('')}</div>`;
+}
 function showAuth(mode, opts = {}) {
   if (opts.after) authAfter = opts.after;
+  authState = { mode, opts: { reasonKey: opts.reasonKey } };
   const closable = !!ACCOUNT && mode !== 'welcome';
-  const x = closable ? '<button class="close" data-a="close" aria-label="Kapat">✕</button>' : '';
+  const x = closable ? `<button class="close" data-a="close" aria-label="${esc(t('au_close'))}">✕</button>` : '';
+  const terms = `<a href="${privacyUrl()}" target="_blank" rel="noopener">${esc(t('au_terms_link'))}</a>`;
   let html = '';
   if (mode === 'welcome') {
-    html = `<img class="logo" src="icon-192.png" alt=""><h1>İĞNE USTASI</h1>
-      <p>İlerlemen, altınların ve jokerlerin hesabında saklanır. Telefon değişse de kaldığın yerden devam edersin.</p>
-      <button class="green" data-a="register">Hesap oluştur</button>
-      <button class="blue" data-a="login">Giriş yap</button>
-      <button class="ghost" data-a="guest">Misafir olarak oyna</button>
+    html = `${langSwitch()}<img class="logo" src="icon-192.png" alt=""><h1>${esc(BRAND.toLocaleUpperCase(LANG))}</h1>
+      <p>${esc(t('au_intro'))}</p>
+      <button class="green" data-a="register">${esc(t('create_account'))}</button>
+      <button class="blue" data-a="login">${esc(t('login'))}</button>
+      <button class="ghost" data-a="guest">${esc(t('au_guest'))}</button>
       <div class="err"></div>
-      <div class="small">Misafir hesabıyla satın alma yapılamaz. Sonradan hesap oluşturursan ilerlemen aktarılır.</div>
-      <div class="legal"><a href="privacy.html" target="_blank" rel="noopener">Gizlilik politikası ve kullanım şartları</a></div>`;
+      <div class="small">${esc(t('au_guest_note'))}</div>
+      <div class="legal"><a href="${privacyUrl()}" target="_blank" rel="noopener">${esc(t('privacy_link'))}</a></div>`;
   } else if (mode === 'register' || mode === 'login') {
     const reg = mode === 'register', fromGuest = reg && ACCOUNT && ACCOUNT.guest;
-    html = `${x}<h2>${reg ? 'Hesap oluştur' : 'Giriş yap'}</h2>
-      <p>${esc(opts.reason || (fromGuest ? 'Misafir ilerlemen, altınların ve jokerlerin bu hesaba aktarılır.' : reg ? 'Kullanıcı adı ve şifre belirle.' : 'Kullanıcı adın ve şifrenle gir.'))}</p>
+    const intro = opts.reasonKey ? t(opts.reasonKey) : fromGuest ? t('au_from_guest') : reg ? t('au_reg_intro') : t('au_login_intro');
+    html = `${x}<h2>${esc(reg ? t('create_account') : t('login'))}</h2>
+      <p>${esc(intro)}</p>
       <form novalidate>
-        <label for="au">Kullanıcı adı</label>
+        <label for="au">${esc(t('au_username'))}</label>
         <input id="au" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="16" required>
-        <label for="ap">Şifre</label>
+        <label for="ap">${esc(t('au_password'))}</label>
         <input id="ap" name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="72" required>
-        ${reg ? '<label for="ap2">Şifre (tekrar)</label><input id="ap2" name="password2" type="password" autocomplete="new-password" maxlength="72" required>' : ''}
-        <label class="chk"><input type="checkbox" data-a="showpw"> Şifreyi göster</label>
-        ${reg ? '<label class="chk"><input type="checkbox" name="terms"> <span><a href="privacy.html" target="_blank" rel="noopener">Gizlilik politikasını ve kullanım şartlarını</a> okudum, kabul ediyorum</span></label>' : ''}
-        <button class="${reg ? 'green' : 'blue'}" type="submit">${reg ? 'Hesabı oluştur' : 'Giriş yap'}</button>
+        ${reg ? `<label for="ap2">${esc(t('au_password2'))}</label><input id="ap2" name="password2" type="password" autocomplete="new-password" maxlength="72" required>` : ''}
+        <label class="chk"><input type="checkbox" data-a="showpw"> ${esc(t('au_show_pw'))}</label>
+        ${reg ? `<label class="chk"><input type="checkbox" name="terms"> <span>${esc(t('au_terms', { link: '\u0000' })).replace('\u0000', terms)}</span></label>` : ''}
+        <button class="${reg ? 'green' : 'blue'}" type="submit">${esc(reg ? t('au_create_btn') : t('login'))}</button>
       </form>
       <div class="err"></div>
-      ${reg ? '<div class="small">3–16 karakter: harf, rakam, alt çizgi · Şifre en az 6 karakter</div>' : ''}
-      ${!ACCOUNT ? '<button class="ghost" data-a="welcome">Geri</button>' : `<button class="ghost" data-a="${reg ? 'login' : 'register'}">${reg ? 'Zaten hesabım var' : 'Yeni hesap oluştur'}</button>`}
-      ${mode === 'login' && ACCOUNT && ACCOUNT.guest ? '<div class="small">Başka hesaba girersen bu misafir ilerlemesi bu cihazda kalmaz. Önce hesap oluşturup aktarabilirsin.</div>' : ''}`;
+      ${reg ? `<div class="small">${esc(t('au_rules'))}</div>` : ''}
+      ${!ACCOUNT ? `<button class="ghost" data-a="welcome">${esc(t('au_back'))}</button>` : `<button class="ghost" data-a="${reg ? 'login' : 'register'}">${esc(reg ? t('au_have') : t('au_new'))}</button>`}
+      ${mode === 'login' && ACCOUNT && ACCOUNT.guest ? `<div class="small">${esc(t('au_login_guest_warn'))}</div>` : ''}`;
   } else if (mode === 'delete') {
     const guest = ACCOUNT && ACCOUNT.guest;
-    html = `${x}<h2 style="color:#ff8da1">Hesabı sil</h2>
-      <p>${guest ? 'Misafir ilerlemen kalıcı olarak silinir.' : `<b>${esc(ACCOUNT.username)}</b> hesabı, ilerlemesi, altınları ve jokerleri kalıcı olarak silinir. Bu geri alınamaz.`}</p>
+    html = `${x}<h2 style="color:#ff8da1">${esc(t('au_delete_t'))}</h2>
+      <p>${guest ? esc(t('au_delete_guest')) : esc(t('au_delete_user', { name: '\u0000' })).replace('\u0000', `<b>${esc(ACCOUNT.username)}</b>`)}</p>
       <form novalidate>
-        ${guest ? '' : '<label for="ap">Onay için şifren</label><input id="ap" name="password" type="password" autocomplete="current-password" maxlength="72" required>'}
-        <button class="red" type="submit">Kalıcı olarak sil</button>
+        ${guest ? '' : `<label for="ap">${esc(t('au_delete_pw'))}</label><input id="ap" name="password" type="password" autocomplete="current-password" maxlength="72" required>`}
+        <button class="red" type="submit">${esc(t('au_delete_btn'))}</button>
       </form>
       <div class="err"></div>
-      <button class="ghost" data-a="close">Vazgeç</button>`;
+      <button class="ghost" data-a="close">${esc(t('au_cancel'))}</button>`;
   }
   authRoot.innerHTML = `<div class="card" role="dialog" aria-modal="true">${html}</div>`;
   authRoot.classList.add('open');
@@ -97,6 +108,7 @@ function showAuth(mode, opts = {}) {
   const setErr = (m) => { if (err) err.textContent = m || ''; };
   const busy = (on) => authRoot.querySelectorAll('button,input').forEach((el) => { el.disabled = on; });
 
+  authRoot.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.lang)));
   const showPw = authRoot.querySelector('[data-a="showpw"]');
   if (showPw) showPw.addEventListener('change', () => authRoot.querySelectorAll('input[name^="password"]').forEach((el) => { el.type = showPw.checked ? 'text' : 'password'; }));
   authRoot.querySelectorAll('[data-a]').forEach((b) => b.dataset.a !== 'showpw' && b.addEventListener('click', async (e) => {
@@ -109,10 +121,10 @@ function showAuth(mode, opts = {}) {
       busy(false);
       if (!r.ok) { setErr(r.error); return; }
       authDone();
-      if (r.offline) showToast('İnternet yok: ilerleme cihazda tutuluyor, bağlanınca kaydedilir');
+      if (r.offline) showToast(t('au_offline'));
       return;
     }
-    showAuth(a, { reason: opts.reason });
+    showAuth(a, { reasonKey: opts.reasonKey });
   }));
   const form = authRoot.querySelector('form');
   if (form) {
@@ -121,17 +133,24 @@ function showAuth(mode, opts = {}) {
       e.preventDefault();
       const f = new FormData(form), u = String(f.get('username') || '').trim(), pw = String(f.get('password') || '');
       setErr('');
-      if (mode === 'register' && pw !== String(f.get('password2') || '')) { setErr('Şifreler aynı değil'); return; }
-      if (mode === 'register' && !f.get('terms')) { setErr('Devam etmek için gizlilik politikasını ve şartları kabul et'); return; }
+      if (mode === 'register' && pw !== String(f.get('password2') || '')) { setErr(t('au_pw_mismatch')); return; }
+      if (mode === 'register' && !f.get('terms')) { setErr(t('au_need_terms')); return; }
       busy(true);
       const r = mode === 'register' ? await register(u, pw) : mode === 'login' ? await login(u, pw) : await deleteAccount(pw);
       busy(false);
       if (!r.ok) { setErr(r.error); return; }
-      if (mode === 'delete') { closeAuth(); afterSignOut('Hesap silindi'); return; }
+      if (mode === 'delete') { closeAuth(); afterSignOut(t('au_deleted')); return; }
       authDone();
-      showToast(mode === 'register' ? `Hoş geldin, ${ACCOUNT.username}! Hesabın hazır` : `Tekrar hoş geldin, ${ACCOUNT.username}`);
+      showToast(mode === 'register' ? t('au_welcome_new', { name: ACCOUNT.username }) : t('au_welcome_back', { name: ACCOUNT.username }));
     });
   }
+}
+// Dil değişince açık üyelik penceresi yeni dilde yeniden çizilir (yazılanlar korunur)
+function onLangChange() {
+  if (!authRoot.classList.contains('open') || !authState) return;
+  const vals = {}; authRoot.querySelectorAll('input[name]').forEach((el) => { vals[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
+  showAuth(authState.mode, authState.opts);
+  authRoot.querySelectorAll('input[name]').forEach((el) => { if (el.name in vals) { if (el.type === 'checkbox') el.checked = vals[el.name]; else el.value = vals[el.name]; } });
 }
 
 // Çıkış ya da silme sonrası: giriş ekranına dön
@@ -144,6 +163,6 @@ function afterSignOut(msg) {
 // Oturum süresi dolduysa: kayıtlı hesapta tekrar giriş istenir
 function sessionExpired() {
   if (!ACCOUNT) return;
-  if (ACCOUNT.guest) { ACCOUNT = null; saveAccount(); afterSignOut('Misafir oturumu bulunamadı'); return; }
-  showAuth('login', { reason: 'Oturumun sona erdi. İlerlemen hesabında güvende, tekrar giriş yap.' });
+  if (ACCOUNT.guest) { ACCOUNT = null; saveAccount(); afterSignOut(t('au_guest_lost')); return; }
+  showAuth('login', { reasonKey: 'au_expired' });
 }

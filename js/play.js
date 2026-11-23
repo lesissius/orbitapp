@@ -4,7 +4,7 @@ let screen = 'title';          // 'title' | 'map' | 'play'
 let paused = false;
 let overlay = null;            // harita/oyun üstü pencere: { type: 'market'|'settings'|'milestone'|'info', ... }
 let curNode = null, lv = null;
-let rot = 0, t = 0, stuck = [], flying = [], bounced = [], particles = [], fx = [], popups = [];
+let rot = 0, gameT = 0, stuck = [], flying = [], bounced = [], particles = [], fx = [], popups = [];
 let pinsLeft = 0, stuckCount = 0, state = 'play', stateT = 0, shake = 0, dirMul = 1, orbPulse = 0, flash = 0;
 let banner = null, timeLeft = 0, slowT = 0, coinsRun = 0, giftsRun = {}, result = null, bossIntroSeen = '';
 let usedSkills = 0;
@@ -28,7 +28,7 @@ function startLevel(node) {
   // küredeki altın para yalnızca bölüm ilk kez geçilene kadar çıkar (tekrar oynayarak altın kasılmasın)
   if (lv.kind !== 'bonus' && P.coins[node.id]) lv.targets = lv.targets.filter(x => x.kind !== 'coin');
   screen = 'play'; paused = false; overlay = null;
-  rot = 0; t = 0; dirMul = 1;
+  rot = 0; gameT = 0; dirMul = 1;
   stuck = lv.pre.map(a => ({ a, pre: true }));
   flying = []; bounced = []; particles = []; fx = []; popups = [];
   pinsLeft = lv.pinsTotal; stuckCount = 0; coinsRun = 0; giftsRun = {}; usedSkills = 0;
@@ -37,14 +37,14 @@ function startLevel(node) {
   P.lastId = node.id; saveProgress();
   // yeni kural ilk kez çıkınca kısa tanıtım
   const intro = [
-    [lv.kind !== 'bonus', 'stars', `${lv.thresholds[0]} İĞNE: GEÇ`, `${lv.thresholds[1]} iğne ★★ · ${lv.thresholds[2]} iğne ★★★`],
-    [lv.timeLimit > 0, 'timed', 'SÜRELİ BÖLÜM', `${lv.timeLimit} saniyede iğneleri sapla`],
-    [lv.zones.some(z => z.type === 'bomb'), 'bomb', 'BOMBA', 'Patlayan iğne yanındaki iğneni de düşürür'],
-    [lv.zones.some(z => z.type === 'shield'), 'shield', 'ZIRH', 'Metalden seken iğne kaybolur, küre ters döner'],
-    [lv.targets.some(x => x.kind === 'coin') && lv.kind !== 'bonus', 'coin', 'ALTIN PARA', 'Paraya iğne sapla: +2 altın'],
-    [lv.zones.some(z => z.vel), 'drift', 'GEZEN ZIRH', 'Metal plakalar kendi başına kayıyor'],
-    [lv.kind === 'bonus' && lv.btype === 'gold', 'bonus_gold', 'BONUS: ALTIN YAĞMURU', 'Paraları vur, altınları topla'],
-    [lv.kind === 'bonus' && lv.btype === 'skill', 'bonus_skill', 'BONUS: HEDİYE KUTULARI', 'Kutuları vur, joker kazan'],
+    [lv.kind !== 'bonus', 'stars', t('intro_stars_t', { n: lv.thresholds[0] }), t('intro_stars_d', { a: lv.thresholds[1], b: lv.thresholds[2] })],
+    [lv.timeLimit > 0, 'timed', t('intro_timed_t'), t('intro_timed_d', { n: lv.timeLimit })],
+    [lv.zones.some(z => z.type === 'bomb'), 'bomb', t('intro_bomb_t'), t('intro_bomb_d')],
+    [lv.zones.some(z => z.type === 'shield'), 'shield', t('intro_shield_t'), t('intro_shield_d')],
+    [lv.targets.some(x => x.kind === 'coin') && lv.kind !== 'bonus', 'coin', t('intro_coin_t'), t('intro_coin_d')],
+    [lv.zones.some(z => z.vel), 'drift', t('intro_drift_t'), t('intro_drift_d')],
+    [lv.kind === 'bonus' && lv.btype === 'gold', 'bonus_gold', t('intro_bgold_t'), t('intro_bgold_d')],
+    [lv.kind === 'bonus' && lv.btype === 'skill', 'bonus_skill', t('intro_bskill_t'), t('intro_bskill_d')],
   ].find(([on, key]) => on && !P.seen[key]);
   banner = null;
   if (intro) { P.seen[intro[1]] = true; saveProgress(); banner = { title: intro[2], text: intro[3], t: 0 }; }
@@ -78,18 +78,18 @@ function bossRage() {
     const okB = !inArc(norm(Math.PI / 2 - rot), { start: start - 0.6, width: w + 1.2 });
     if (okP && okZ && okB) { lv.zones.push({ type: 'bomb', width: w, start, born: 1 }); placed = true; }
   }
-  banner = { title: 'ÖFKELENDİ!', text: placed ? 'Boss hızlandı ve bomba çıkardı' : 'Boss hızlandı', t: 0 };
+  banner = { title: t('rage_t'), text: placed ? t('rage_d1') : t('rage_d2'), t: 0 };
 }
 
 function angularVelocity() {
   const base = lv.speed * lv.dir * dirMul * (slowT > 0 ? 0.45 : 1);
   switch (lv.pattern) {
     // ileri tam süre, geri yarım süre: küre net ilerler, her açı aşağı gelir
-    case 'reverse': { const c = t % (lv.period * 1.5); return base * (c < lv.period ? 1 : -1); }
-    case 'wave': return base * (0.35 + 0.9 * (0.5 + 0.5 * Math.sin(t * TAU / (lv.period * 1.6))));
-    case 'pulse': { const p = (t % lv.period) / lv.period; return clamp(base * (p < 0.7 ? 0.45 : 2.4), -4.6, 4.6); }
+    case 'reverse': { const c = gameT % (lv.period * 1.5); return base * (c < lv.period ? 1 : -1); }
+    case 'wave': return base * (0.35 + 0.9 * (0.5 + 0.5 * Math.sin(gameT * TAU / (lv.period * 1.6))));
+    case 'pulse': { const p = (gameT % lv.period) / lv.period; return clamp(base * (p < 0.7 ? 0.45 : 2.4), -4.6, 4.6); }
     case 'boss': {
-      const b = lv.boss, x = t / b.seg, i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f);
+      const b = lv.boss, x = gameT / b.seg, i = Math.floor(x), f = x - i, s = f * f * (3 - 2 * f);
       return base * (b.seq[i % 64] * (1 - s) + b.seq[(i + 1) % 64] * s) * (b.rage ? 1.35 : 1);
     }
     default: return base;
@@ -117,9 +117,9 @@ function useSkill(key) {
   if ((P.skills[key] || 0) <= 0) { openMarket(); return; }
   P.skills[key]--; usedSkills++; saveProgress();
   sfx.skill();
-  if (key === 'slow') { slowT = Math.max(slowT, 0) + 8; addPopup('YAVAŞ!', cx, cy - R * 1.6, '#8fd8ff'); }
-  if (key === 'pins2') { pinsLeft += 2; lv.pinsTotal += 2; addPopup('+2 İĞNE', cx, LAUNCH_Y - 30, '#7dff9a'); }
-  if (key === 'time15') { timeLeft += 15; addPopup('+15 SN', cx, cy - R * 1.6, '#ffd34d'); }
+  if (key === 'slow') { slowT = Math.max(slowT, 0) + 8; addPopup(t('pop_slow'), cx, cy - R * 1.6, '#8fd8ff'); }
+  if (key === 'pins2') { pinsLeft += 2; lv.pinsTotal += 2; addPopup(t('pop_pins'), cx, LAUNCH_Y - 30, '#7dff9a'); }
+  if (key === 'time15') { timeLeft += 15; addPopup(t('pop_time'), cx, cy - R * 1.6, '#ffd34d'); }
   addFx('fx_ring', cx, cy, R, R * 3.5, 0.5);
 }
 
@@ -203,7 +203,7 @@ function update(dt) {
   stateT += dt;
   if (screen !== 'play') { rot = norm(rot + 0.6 * dt); updateFx(dt); return; }
   if (state === 'play' || state === 'win') {
-    t += dt;
+    gameT += dt;
     const w = state === 'win' ? angularVelocity() * (1 + stateT * 6) : angularVelocity();
     rot = norm(rot + w * dt);
     for (const z of lv.zones) { // gezen zırh: iğneye ya da başka bölgeye değince geri döner
@@ -251,8 +251,8 @@ function update(dt) {
         stuck.splice(stuck.indexOf(near), 1); stuckCount--;
         const wa = near.a + rot;
         bounced.push({ x: cx + Math.cos(wa) * (R + L / 2), y: cy + Math.sin(wa) * (R + L / 2), vx: Math.cos(wa) * 420, vy: Math.sin(wa) * 420 - 200, r: wa - Math.PI / 2, vr: 16, life: 1.1 });
-        addPopup('−1 İĞNE', tipX, tipY + 40, '#ff6b6b');
-      } else addPopup('BOOM', tipX, tipY + 40, '#ff6b6b');
+        addPopup(t('pop_minus'), tipX, tipY + 40, '#ff6b6b');
+      } else addPopup(t('pop_boom'), tipX, tipY + 40, '#ff6b6b');
       loseFlyingPin(tipX, tipY);
       checkEnd(); continue;
     }
@@ -261,7 +261,7 @@ function update(dt) {
       loseFlyingPin(tipX, tipY);
       addFx('fx_metal', tipX, tipY + R * 0.2, R * 0.5, R * 1.5, 0.4, Math.PI);
       addFx('fx_spark', tipX, tipY, R * 0.3, R * 1.1, 0.25);
-      addPopup('SEKTİ', tipX, tipY + 40, '#c9d3e6');
+      addPopup(t('pop_bounce'), tipX, tipY + 40, '#c9d3e6');
       checkEnd(); continue;
     }
     const clash = stuck.find(s => angDiff(s.a, a) < GAP);
@@ -271,7 +271,7 @@ function update(dt) {
       loseFlyingPin(tipX, cy + R + L * 0.5);
       addFx('fx_spark', tipX, cy + R + L, R * 0.3, R * 1.4, 0.3, Math.random());
       burst(tipX, cy + R + L, '#ff4d6d', 12, 200);
-      addPopup('ÇARPTI', tipX, cy + R + L + 30, '#ff8da1');
+      addPopup(t('pop_clash'), tipX, cy + R + L + 30, '#ff8da1');
       checkEnd(); continue;
     }
     stuck.push({ a, born: 1 }); stuckCount++;
@@ -289,7 +289,7 @@ function update(dt) {
       addFx('fx_gold', tipX, tipY, R * 0.5, R * 2.4, 0.6, 0, 1);
       burst(tipX, tipY, '#ffd34d', 20, 320, 0.7, 3);
       if (tg.kind === 'coin') {
-        coinsRun += tg.value; sfx.coin(); addPopup(`+${tg.value} ALTIN`, tipX, tipY + 50, '#ffd34d');
+        coinsRun += tg.value; sfx.coin(); addPopup(t('pop_gold', { n: tg.value }), tipX, tipY + 50, '#ffd34d');
         if (lv.kind !== 'bonus' && !P.coins[lv.id]) { P.coins[lv.id] = 1; P.gold += tg.value; saveProgress(); } // bölüm parası hesap başına bir kez
       }
       else { const keys = Object.keys(SKILL_INFO), k = keys[Math.floor(Math.random() * keys.length)]; giftsRun[k] = (giftsRun[k] || 0) + 1; sfx.skill(); addPopup(SKILL_INFO[k].name.toUpperCase(), tipX, tipY + 50, '#7dff9a'); }
@@ -335,9 +335,9 @@ function simLevel(id, maxTime = 120) {
   let time = 0, minFree = 1;
   while (time < maxTime && state === 'play') {
     if (flying.length === 0 && pinsLeft > 0) {
-      const t0 = t; let rr = rot;
-      for (let k = 0; k < Math.ceil(travel / dt); k++) { rr += angularVelocity() * dt; t += dt; }
-      t = t0;
+      const t0 = gameT; let rr = rot;
+      for (let k = 0; k < Math.ceil(travel / dt); k++) { rr += angularVelocity() * dt; gameT += dt; }
+      gameT = t0;
       if (safeAt(norm(Math.PI / 2 - rr))) {
         let ok = 0; for (let i = 0; i < 180; i++) if (safeAt(i / 180 * TAU)) ok++;
         minFree = Math.min(minFree, ok / 180);

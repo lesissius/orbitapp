@@ -97,7 +97,16 @@ function cors(req, env) {
 }
 const SEC_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
 const json = (req, env, status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...SEC_HEADERS, ...cors(req, env) } });
-const fail = (req, env, status, message, extra = {}) => json(req, env, status, { error: message, ...extra });
+// Hata kodları: oyun mesajı oyuncunun dilinde gösterir (error alanı Türkçe yedek)
+const MSG_CODES = {
+  'Kullanıcı adı 3–16 karakter olmalı: harf, rakam ve alt çizgi': 'username_format', 'Bu kullanıcı adı kullanılamaz': 'username_reserved',
+  'Bu kullanıcı adı uygun değil': 'username_bad', 'Şifre 6–72 karakter olmalı': 'password_length',
+  'Bu şifre çok kolay tahmin edilir, başka bir şifre seç': 'password_common', 'Şifre kullanıcı adını içermesin': 'password_username',
+  'Kullanım şartlarını ve gizlilik politikasını kabul etmelisin': 'terms', 'Bu kullanıcı adı alınmış': 'username_taken',
+  'Kullanıcı adı ya da şifre yanlış': 'bad_login', 'Şifre yanlış': 'bad_password', 'Oturum geçersiz, tekrar giriş yap': 'session', 'Sunucu hatası': 'server',
+};
+const codeFor = (m) => MSG_CODES[m] || (/^Çok (fazla|sık)/.test(m) ? 'rate' : undefined);
+const fail = (req, env, status, message, extra = {}) => json(req, env, status, { error: message, code: codeFor(message), ...extra });
 async function readJson(req, max) {
   const raw = await req.text();
   if (raw.length > max) return { __tooBig: true };

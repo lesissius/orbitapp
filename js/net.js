@@ -19,7 +19,7 @@ async function api(method, path, body, { token = ACCOUNT && ACCOUNT.token, timeo
     });
     let data = {}; try { data = await r.json(); } catch {}
     return { status: r.status, data };
-  } catch { return { status: 0, data: { error: 'Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.' } }; }
+  } catch { return { status: 0, data: { error: t('net_unreachable'), code: 'net' } }; }
   finally { clearTimeout(timer); }
 }
 
@@ -42,7 +42,7 @@ async function startGuest() {
     adoptAccount({ id: 'local-' + Math.random().toString(36).slice(2, 10), username: null, guest: true, token: null, offline: true }, seed, 0);
     return { ok: true, offline: true };
   }
-  return { ok: false, error: r.data.error || 'Misafir hesabı açılamadı' };
+  return { ok: false, error: errText(r.data, 'guest_failed') };
 }
 // Giriş/kayıt/çıkış sırasında arka plan kaydını durdurur, süren kaydın bitmesini bekler
 async function exclusive(fn) {
@@ -59,7 +59,7 @@ async function registerImpl(username, password) {
   // hesapsız açılan yeni hesapta cihazdaki eski oyun kaydı da gönderilir (sunucu sınırlı kabul eder)
   const seed = token ? undefined : (takeLegacyProgress(false) || undefined);
   const r = await api('POST', '/api/register', { username, password, acceptTerms: true, progress: seed }, { token });
-  if (r.status !== 200) return { ok: false, error: r.data.error || 'Kayıt olunamadı' };
+  if (r.status !== 200) return { ok: false, error: errText(r.data, 'register_failed') };
   if (seed) takeLegacyProgress(true);
   const keep = ACCOUNT && ACCOUNT.guest ? P : null; // misafirden yükseltmede ilerleme aynen kalır
   adoptAccount({ ...r.data.user, token: r.data.token }, r.data.progress || keep, r.data.version);
@@ -68,7 +68,7 @@ async function registerImpl(username, password) {
 }
 async function loginImpl(username, password) {
   const r = await api('POST', '/api/login', { username, password }, { token: null });
-  if (r.status !== 200) return { ok: false, error: r.data.error || 'Giriş yapılamadı' };
+  if (r.status !== 200) return { ok: false, error: errText(r.data, 'login_failed') };
   adoptAccount({ ...r.data.user, token: r.data.token }, r.data.progress, r.data.version);
   if (!r.data.progress) { P = normalizeProgress(null); store.set('p2_' + ACCOUNT.id, P); await pushProgress(true, false, true); }
   return { ok: true };
@@ -79,10 +79,10 @@ async function logoutImpl() {
 }
 const deleteAccount = (pw) => exclusive(() => deleteAccountImpl(pw));
 async function deleteAccountImpl(password) {
-  if (!ACCOUNT) return { ok: false, error: 'Hesap yok' };
+  if (!ACCOUNT) return { ok: false, error: t('no_account') };
   if (!ACCOUNT.offline) {
     const r = await api('DELETE', '/api/account', ACCOUNT.guest ? {} : { password });
-    if (r.status !== 200) return { ok: false, error: r.data.error || 'Hesap silinemedi' };
+    if (r.status !== 200) return { ok: false, error: errText(r.data, 'delete_failed') };
   }
   try { localStorage.removeItem('igne_p2_' + ACCOUNT.id); } catch {}
   ACCOUNT = null; saveAccount(); P = normalizeProgress(null);
@@ -124,7 +124,7 @@ async function pushProgress(force = false, keepalive = false, duringAuth = false
   if (r.status === 409) { // başka cihazda daha yeni ilerleme var: o yüklenir
     P = normalizeProgress(r.data.progress); ACCOUNT.version = r.data.version; saveAccount();
     store.set('p2_' + ACCOUNT.id, P); dirty = false; syncState = 'idle';
-    if (typeof showToast === 'function') showToast('Başka cihazdaki daha yeni ilerleme yüklendi');
+    if (typeof showToast === 'function') showToast(t('newer_loaded'));
     return;
   }
   if (r.status === 401) { syncState = 'error'; ACCOUNT.token = null; saveAccount(); if (typeof sessionExpired === 'function') sessionExpired(); return; }
@@ -133,7 +133,7 @@ async function pushProgress(force = false, keepalive = false, duringAuth = false
     console.warn('İlerleme reddedildi:', r.data.error);
     P = normalizeProgress(r.data.progress); ACCOUNT.version = r.data.version || ACCOUNT.version; saveAccount();
     store.set('p2_' + ACCOUNT.id, P); dirty = false; syncState = 'idle'; viewChapter = maxOpenChapter();
-    if (typeof showToast === 'function') showToast('İlerleme doğrulanamadı, son geçerli kayıt yüklendi');
+    if (typeof showToast === 'function') showToast(t('rejected_loaded'));
     return;
   }
   syncState = 'error'; console.warn('İlerleme kaydedilemedi:', r.data.error);

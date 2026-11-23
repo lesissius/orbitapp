@@ -1,14 +1,14 @@
 // Çevrimdışı oynama: oyun dosyaları ilk açılışta önbelleğe alınır.
 // Oyun güncellenince VERSION'u ve index.html içindeki ?v= sayısını artırın; eski önbellek silinir.
-const VERSION = 'igne-v8';
+const VERSION = 'igne-v9';
 const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
   'orb1', 'orb2', 'orb3', 'orb4', 'orb5', 'orb6', 'boss1', 'boss2', 'boss3',
   'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home',
   'bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin',
   'sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'];
 const ASSETS = [
-  './', 'index.html', 'privacy.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'js/core.js', 'js/net.js', 'js/play.js', 'js/render.js', 'js/screens.js', 'js/auth.js', 'js/main.js',
+  './', 'index.html', 'privacy.html', 'privacy-en.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+  'js/core.js', 'js/i18n.js', 'js/net.js', 'js/play.js', 'js/render.js', 'js/screens.js', 'js/auth.js', 'js/main.js',
   ...SPRITES.map(n => `assets/${n}.png`),
   ...[1, 2, 3, 4, 5, 6].map(i => `assets/bg${i}.webp`),
   ...[1, 2, 3].map(i => `assets/map${i}.webp`),
