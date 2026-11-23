@@ -17,6 +17,9 @@ Oyundaki tüm görseller OpenAI GPT görsel üretimiyle, Codex CLI üzerinden ü
 | `art/needles.png` | 2×1, yeşil perde: düz gümüş dikiş iğnesi ve eski bronz iğne (topuzsuz) | `assets/pin.png`, `assets/pin_old.png` (parts.png içindeki topuzlu iğnelerin yerine) |
 | `art/sk_pins2.png` | +2 İğne joker simgesi, düz iğnelerle; yeşil zemin yalnızca kenardan silindi (yeşil artı rozeti korunur) | `assets/sk_pins2.png` |
 | `art/logo.png` | Orbitapp logosu: "O" harfi iğne saplı parlak küre, yörünge çizgisi; yeşil perdede üretildi | `assets/logo.png` (900 px), giriş ekranı ve hoş geldin penceresi |
+| `art/arrows.png` | 2×1, yeşil perde: oyuncu oku (açık ahşap, turuncu-altın tüy) ve eski koyu ok | `assets/arrow.png`, `assets/arrow_old.png` (iğnelerin yerine) |
+| `art/orbs_theme_a..g.png` | 3×1, yeşil ya da mavi perde: 20 kısmın temalı küreleri (perde yalnızca kenardan silinir) | `assets/orb1..orb20.png` (560 px) |
+| `art/concept/bgN_*.png` | 1024×1536 kısım arka planı konseptleri; ortası küre için sakin bırakıldı | `assets/bgN.webp` (768×1152); üstüne kodla hareketli parçacık ve canlılar çizilir |
 | `art/bg/bg1..6.png` | 1024×1536 dikey arka planlar, kürelerle aynı renk temaları | `assets/bg1..6.webp` (768×1152) |
 
 **Ortak istem:** stilize, parlak casual mobil oyun çizimi; sade güçlü şekiller, sol üstten yumuşak ışık, hafif kenar ışığı; yazı, harf, sayı, filigran yok. Çıkıntı modülleri yandan görünüm ve altı düz, böylece kürenin yüzeyine dizilebiliyor. bg2–bg6, bg1 referans verilerek aynı stilde üretildi.

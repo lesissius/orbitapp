@@ -4,7 +4,7 @@ const TAU = Math.PI * 2;
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
-let cx, cy, R, L, HEAD, LAUNCH_Y, GAP;
+let cx, cy, R, L, EMB, HEAD, LAUNCH_Y, GAP;
 let SAFE = { top: 0, bottom: 0, left: 0, right: 0 };
 const FONT = 'system-ui,-apple-system,Segoe UI,sans-serif';
 let SIM = false; // test botu çalışırken ses, titreşim ve kayıt kapalı
@@ -27,7 +27,7 @@ const PINS_NORMAL = 12, STARS_NORMAL = [5, 8, 10];
 const PINS_BOSS = 14, STARS_BOSS = [6, 9, 12];
 const PINS_BONUS = 15;
 const isTimed = (c, i) => i === 4 || i === 8;
-const timeLimit = (c) => Math.max(20, 32 - c * 2);
+const timeLimit = (d) => Math.round(clamp(34 - d * 1.6, 20, 32)); // zorluğa göre süre (saniye)
 const milestoneReq = (c) => Math.min(22, 14 + c);           // kısım içindeki 30 yıldızdan gereken
 const milestoneReward = (c) => {                             // mihenk taşı ödülü
   const r = { gold: 20 + c * 5, slow: 1, pins2: 1, time15: 1 };
@@ -101,7 +101,7 @@ function nodeUnlocked(node) {
   if (node.i === 1) return true;
   return starsOf(`${node.c}-${node.i - 1}`) > 0;
 }
-const maxOpenChapter = () => { let c = 1; while (P.ms[c]) c++; return c; };
+const maxOpenChapter = () => { let c = 1; while (P.ms[c] && c < MAX_CHAPTER) c++; return c; };
 function nextPlayable() { // haritada ilk oynanmamış açık bölüm
   const c = maxOpenChapter();
   for (const nd of chapterNodes(c)) if (nd.kind !== 'bonus' && nd.kind !== 'milestone' && nodeUnlocked(nd) && !starsOf(nd.id)) return nd;
@@ -199,7 +199,7 @@ function musicTick() {
   const boss = screen === 'play' && lv && lv.boss;
   const bar = boss ? 1.6 : 2.4;
   while (musicNext < actx.currentTime + 0.6) {
-    const prog = boss ? BOSS_PROG : PROGS[themeIndex()];
+    const prog = boss ? BOSS_PROG : PROGS[themeIndex() % PROGS.length];
     const chord = prog[musicBar % prog.length];
     for (const f of chord) musicNote(f, musicNext, bar * 1.05, 'triangle', 0.025, bar * 0.35);
     musicNote(chord[0] / 2, musicNext, bar, 'sine', 0.05, 0.05);
@@ -213,31 +213,54 @@ function musicTick() {
 }
 
 // ---------- temalar ----------
+// 20 kısım, her birinin kendi küresi, arka planı ve canlıları var.
+// inner: küre içinde dönen parçacık, back: arka plan parçacığı, cast: arka planda hareket eden canlılar [sprite, adet, davranış, boy]
+const MAX_CHAPTER = 20;
+const T = (c0, c1, accent, inner, innerC, back, backC, cast = [], extra = {}) => ({ bg: [c0, c1], orb: [accent, c1], pin: '#fff', accent, glow: accent, inner, innerC, back, backC, cast, ...extra });
 const THEMES = [
-  { bg: ['#1b1640', '#0d0b20'], orb: ['#ffb84d', '#ff6b3d'], pin: '#f4f1ff', accent: '#ffb84d' },
-  { bg: ['#0f2a3a', '#06131c'], orb: ['#5ef0c8', '#1fa3b8'], pin: '#eafffa', accent: '#5ef0c8' },
-  { bg: ['#3a1030', '#170616'], orb: ['#ff7ac6', '#b23ad1'], pin: '#fff0fa', accent: '#ff7ac6' },
-  { bg: ['#1f2a10', '#0b1205'], orb: ['#c8f25e', '#5fae2b'], pin: '#f7ffe8', accent: '#c8f25e' },
-  { bg: ['#10183a', '#05081c'], orb: ['#8ab4ff', '#4a5bff'], pin: '#eef3ff', accent: '#8ab4ff' },
-  { bg: ['#2a1012', '#100506'], orb: ['#ff6b6b', '#b8202e'], pin: '#fff0f0', accent: '#ff7b7b' },
+  T('#3a1d40', '#140a1c', '#ffb347', 'spark', '#fff3b0', 'mote', '#ffd27a', [['bee', 3, 'fly', 0.3], ['butterfly_o', 2, 'flutter', 0.3]]),
+  T('#0f3a44', '#06131c', '#38f0d8', 'bubble', '#e8fffb', 'bubble', '#bff9ef', [['fish', 4, 'swim', 0.3], ['seagull', 2, 'fly', 0.36]]),
+  T('#4a1640', '#1c0718', '#ff86d9', 'puff', '#ffe3f6', 'petal', '#ffc2ea', [['cloud', 3, 'drift', 0.8], ['balloon', 2, 'rise', 0.36]]),
+  T('#1f3a10', '#0b1205', '#8dff5a', 'firefly', '#f4ff8a', 'firefly', '#f4ff8a', [['butterfly_b', 3, 'flutter', 0.3], ['leaf', 6, 'fall', 0.18]]),
+  T('#141c4a', '#05081c', '#8a96ff', 'star', '#ffffff', 'star', '#dfe4ff', [['planet', 2, 'drift', 0.4], ['comet', 2, 'streak', 0.6]]),
+  T('#3a1014', '#100506', '#ff4d6d', 'glint', '#ffe0e6', 'ember', '#ff9a6b', [['phoenix', 2, 'fly', 0.45], ['shard', 4, 'float', 0.22]]),
+  T('#4a1a3a', '#1c0a18', '#ff7ac8', 'spark', '#ffffff', 'confetti', '#ffffff', [['balloon', 2, 'rise', 0.36], ['cloud', 2, 'drift', 0.7]]),
+  T('#1a3550', '#081422', '#9fe6ff', 'glint', '#ffffff', 'snow', '#ffffff', []),
+  T('#2a2a55', '#10102a', '#ffd86b', 'spark', '#ffffff', 'confetti', '#ffffff', [['butterfly_o', 2, 'flutter', 0.3], ['balloon', 1, 'rise', 0.36], ['cloud', 2, 'drift', 0.7]]),
+  T('#4a3010', '#1a1005', '#ffc14d', 'spark', '#fff1c0', 'mote', '#ffe0a0', [['seagull', 2, 'fly', 0.32]]),
+  T('#3a1508', '#120502', '#ff7a2a', 'glint', '#ffd0a0', 'ember', '#ffae5a', [['phoenix', 2, 'fly', 0.42]]),
+  T('#2a1440', '#0e0618', '#7dffd8', 'firefly', '#b8fff0', 'firefly', '#ffd08a', [['butterfly_b', 2, 'flutter', 0.28]]),
+  T('#3a2810', '#140d05', '#ffb35c', 'glint', '#fff0c8', 'mote', '#ffd9a0', [['balloon', 2, 'rise', 0.34]]),
+  T('#0f3440', '#051218', '#ffd34d', 'bubble', '#fff6d0', 'bubble', '#d8fff6', [['seagull', 2, 'fly', 0.34], ['fish', 2, 'swim', 0.28]]),
+  T('#3a2038', '#140a14', '#ffa8d8', 'puff', '#fff0f8', 'petal', '#ffc8e4', [['butterfly_o', 2, 'flutter', 0.28], ['butterfly_b', 1, 'flutter', 0.28]]),
+  T('#262a44', '#0c0d18', '#ffe14d', 'glint', '#fff8b0', 'rain', '#c8d8ff', [['cloud', 3, 'drift', 0.8]], { storm: true }),
+  T('#081a3a', '#020814', '#ff6fd8', 'bubble', '#9ff7ff', 'bubble', '#9ff7ff', [['fish', 3, 'swim', 0.26]]),
+  T('#16283a', '#060c14', '#4df0ff', 'glint', '#c8ffff', 'mote', '#7ff4ff', []),
+  T('#141a40', '#050618', '#c88cff', 'star', '#ffffff', 'snow', '#ffffff', [['comet', 1, 'streak', 0.6]]),
+  T('#4a3008', '#1a1002', '#ffd23d', 'spark', '#fffbe0', 'mote', '#fff0a0', [['phoenix', 1, 'fly', 0.5]]),
 ];
-const chapterName = (c) => t('ch' + ((c - 1) % 6 + 1));
+const chapterName = (c) => t('ch' + ((c - 1) % MAX_CHAPTER + 1));
 let viewChapter = 1; // haritada bakılan kısım
 const themeIndex = () => ((screen === 'play' && lv ? lv.c : viewChapter) - 1) % THEMES.length;
 const theme = () => THEMES[themeIndex()];
 
 // ---------- görseller (GPT çizimleri; yüklenemezse çizimle yedeklenir) ----------
 const IMG = {};
-const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
-  'orb1', 'orb2', 'orb3', 'orb4', 'orb5', 'orb6', 'boss1', 'boss2', 'boss3',
+const SPRITES = ['arrow', 'arrow_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
+  'boss1', 'boss2', 'boss3',
   'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home', 'logo',
   'bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin',
   'sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'];
 // Görsel sürümü: bir görsel değişince artırılır (sw.js içindeki ASSET_V ile aynı), önbellek eski görseli vermez
-const ASSET_V = 12;
-for (const n of SPRITES) { const im = new Image(); im.onload = () => { IMG[n] = im; }; im.src = `assets/${n}.png?v=${ASSET_V}`; }
-for (let i = 1; i <= 6; i++) { const im = new Image(); im.onload = () => { IMG['bg' + i] = im; }; im.src = `assets/bg${i}.webp?v=${ASSET_V}`; }
-for (let i = 1; i <= 3; i++) { const im = new Image(); im.onload = () => { IMG['map' + i] = im; }; im.src = `assets/map${i}.webp?v=${ASSET_V}`; }
+const ASSET_V = 13;
+const loadImg = (key, src) => { if (IMG[key] || IMG[key] === null) return; IMG[key] = null; const im = new Image(); im.onload = () => { IMG[key] = im; }; im.src = `${src}?v=${ASSET_V}`; };
+for (const n of SPRITES) loadImg(n, `assets/${n}.png`);
+for (let i = 1; i <= 3; i++) loadImg('map' + i, `assets/map${i}.webp`);
+// kısım görselleri (küre + arka plan) gerektiğinde yüklenir: oynanan kısım ve bir sonraki
+function needChapterArt(c) {
+  for (const k of [c, c + 1]) { if (k < 1 || k > MAX_CHAPTER) continue; loadImg('orb' + k, `assets/orb${k}.png`); loadImg('bg' + k, `assets/bg${k}.webp`); }
+}
+needChapterArt(1);
 
 // ---------- yardımcılar ----------
 function mulberry32(a) {
@@ -261,15 +284,26 @@ const SKILL_INFO = {
 };
 
 // node → oynanabilir seviye tanımı (her cihazda aynı üretilir)
+// Zorluk 1–10 ölçeğinde ve kısım içinde artar: kısmın ilk bölümü rahat, boss en zoru.
+// Sonraki kısım yine aşağıdan başlar; tepe noktası kısımdan kısma yavaşça yükselir ama 8.5'te durur
+// (oyun çocuklar ve vakit geçirmek isteyenler için: hiçbir zaman çok zor olmaz).
+function difficulty(c, i) {
+  const start = Math.min(1 + (c - 1) * 0.75, 4), peak = Math.min(5.5 + (c - 1) * 0.5, 8.5);
+  return start + (peak - start) * (clamp(i, 1, 10) - 1) / 9;
+}
+// Zorluğu üretecin eski "seviye numarası" ölçeğine çevirir (d=1 → 1, d=8.5 → ≈50)
+const diffToN = (d) => 1 + (d - 1) * 6.5;
+
 function makeLevel(node) {
   if (node.kind === 'bonus') return makeBonus(node);
-  const c = node.c, i = node.i, n = (c - 1) * 10 + i;
-  const rnd = mulberry32(n * 9973 + 17);
-  const lv = { n, c, i, id: node.id, kind: node.kind };
+  const c = node.c, i = node.i, seed = (c - 1) * 10 + i;
+  const rnd = mulberry32(seed * 9973 + 17);
+  const d = difficulty(c, i), n = diffToN(d);
+  const lv = { n, d, c, i, id: node.id, kind: node.kind };
   const boss = node.kind === 'boss';
   lv.pinsTotal = boss ? PINS_BOSS : PINS_NORMAL;
   lv.thresholds = boss ? STARS_BOSS : STARS_NORMAL;
-  lv.timeLimit = node.kind === 'timed' ? timeLimit(c) : 0;
+  lv.timeLimit = node.kind === 'timed' ? timeLimit(d) : 0;
   lv.speed = Math.min(1.0 + n * 0.03, 2.7);
   lv.dir = rnd() < 0.5 ? 1 : -1;
   const pats = n < 4 ? ['steady'] : n < 9 ? ['steady', 'reverse', 'wave'] : ['steady', 'reverse', 'wave', 'pulse', 'reverse', 'wave'];
@@ -292,7 +326,7 @@ function makeLevel(node) {
   // kapasite: 3 yıldız için gereken iğne + hazır iğneler küreye rahat sığmalı
   // iğne başına ayrılan açı = GAP × density; GAP daralınca density aynı oranda artar (zorluk değişmez)
   const density = Math.max(2.35, 3.4 - n * 0.02) * (0.1276 / GAP);
-  let pre = n === 1 ? 0 : Math.min(Math.floor((n + 1) / 4), 5);
+  let pre = n < 2 ? 0 : Math.min(Math.floor((n + 1) / 4), 5);
   const need = () => lv.thresholds[2] + pre + 1;
   const cap = () => Math.floor((TAU - lv.zones.reduce((s, z) => s + z.width + GAP, 0)) / (GAP * density));
   while (need() > cap()) { if (pre > 0) pre--; else if (lv.zones.length) lv.zones.pop(); else break; }
@@ -330,9 +364,9 @@ function makeLevel(node) {
 // Bonus bölüm: yıldızı yok, bölge yok; küredeki paraları ya da hediyeleri vur
 function makeBonus(node) {
   const c = node.c, rnd = mulberry32(c * 7919 + 3);
-  const lv = { n: (c - 1) * 10 + 5, c, i: 0, id: node.id, kind: 'bonus', btype: node.btype };
+  const lv = { n: diffToN(difficulty(c, 5)), c, i: 0, id: node.id, kind: 'bonus', btype: node.btype };
   lv.pinsTotal = PINS_BONUS; lv.thresholds = [0, 0, 0]; lv.timeLimit = 0;
-  lv.speed = 1.2 + c * 0.05; lv.dir = rnd() < 0.5 ? 1 : -1; lv.pattern = 'wave'; lv.period = 2.4;
+  lv.speed = 1.2 + Math.min(c, 10) * 0.05; lv.dir = rnd() < 0.5 ? 1 : -1; lv.pattern = 'wave'; lv.period = 2.4;
   lv.zones = []; lv.pre = [];
   const count = node.btype === 'gold' ? 6 : 3, off = rnd() * TAU;
   lv.targets = Array.from({ length: count }, (_, k) => ({

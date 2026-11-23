@@ -73,13 +73,14 @@ function drawPinVec(x1, y1, x2, y2, color, glow) {
   ctx.beginPath(); ctx.arc(x2, y2, HEAD, 0, TAU); ctx.fill();
   ctx.shadowBlur = 0;
 }
-function drawPin(tx, ty, dir, len, kind = 'pin', hit = false) {
+// Ok: (tx, ty) ucu, dir dışa bakan yön, len toplam boy. Tüylerin genişliği çarpışma aralığına (GAP) yakın tutulur.
+function drawPin(tx, ty, dir, len, kind = 'arrow', hit = false) {
   const hx = tx + Math.cos(dir) * len, hy = ty + Math.sin(dir) * len;
-  const im = IMG[kind] || IMG.pin;
-  if (!im) { drawPinVec(tx, ty, hx, hy, hit ? '#ff4d6d' : kind === 'pin_old' ? 'rgba(255,255,255,0.55)' : theme().pin, hit); return; }
-  const h = len + HEAD, w = Math.max(h * (im.width / im.height), R * 0.11); // düz iğne: görünen kalınlık çarpışma aralığına yakın
+  const im = IMG[kind] || IMG.arrow;
+  if (!im) { drawPinVec(tx, ty, hx, hy, hit ? '#ff4d6d' : kind === 'arrow_old' ? 'rgba(255,255,255,0.55)' : theme().pin, hit); return; }
+  const h = len, w = h * (im.width / im.height) * 1.1;
   ctx.save(); ctx.translate(tx, ty); ctx.rotate(dir + Math.PI / 2); ctx.drawImage(im, -w / 2, -h, w, h); ctx.restore();
-  if (hit) glowAt(hx, hy, HEAD * 5, 'rgba(255,60,80,0.9)');
+  if (hit) glowAt(hx, hy, R * 0.4, 'rgba(255,60,80,0.9)');
 }
 function glowAt(x, y, size, color) {
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -93,11 +94,7 @@ function drawCover(im, dark = 0) {
   ctx.drawImage(im, (W - bw) / 2, (H - bh) / 2, bw, bh);
   if (dark) { ctx.fillStyle = `rgba(0,0,0,${dark})`; ctx.fillRect(0, 0, W, H); }
 }
-function drawPlayBackground(th) {
-  const bg = IMG['bg' + (themeIndex() + 1)];
-  if (bg) drawCover(bg, 0.18);
-  else { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
-}
+function drawPlayBackground() { drawSceneBackground(lv.c); }
 function drawZone(z, pr) {
   const PROT = R * 0.3, s0 = z.start + rot, s1 = s0 + z.width, bomb = z.type === 'bomb';
   const grow = 1 - (z.born || 0);
@@ -124,26 +121,27 @@ function drawZone(z, pr) {
 
 function drawPlay() {
   const th = theme(), boss = lv.boss, tnow = now();
-  drawPlayBackground(th);
+  drawPlayBackground();
   ctx.save();
   if (shake > 0 && settings.shake && !paused) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
   if (boss) {
     ctx.fillStyle = 'rgba(40,0,0,0.35)'; ctx.fillRect(-20, -20, W + 40, H + 40);
     const pulse = 0.5 + 0.5 * Math.sin(tnow * (boss.rage ? 9 : 4));
     glowAt(cx, cy, R * (4.4 + pulse * 0.8), BOSSES[boss.idx].aura + (boss.rage ? 'aa' : '77'));
-  } else glowAt(cx, cy, R * 4.2, th.orb[0] + '55');
+  } else glowAt(cx, cy, R * 3.2, th.glow + '40');
   if (slowT > 0) glowAt(cx, cy, R * 3.6, `rgba(120,200,255,${0.25 + 0.1 * Math.sin(tnow * 6)})`);
 
   for (const s of stuck) {
     if (boss && state === 'win') break;
-    const wa = s.a + rot, len = L * (1 - (s.born || 0) * 0.25) + R * 0.1;
-    drawPin(cx + Math.cos(wa) * R * 0.9, cy + Math.sin(wa) * R * 0.9, wa, len, s.pre ? 'pin_old' : 'pin', (s.hitT || 0) > 0);
+    const wa = s.a + rot, len = L * (1 - (s.born || 0) * 0.25) + EMB, sway = Math.sin(performance.now() / 25) * (s.wob || 0) * 0.07;
+    drawPin(cx + Math.cos(wa) * (R - EMB), cy + Math.sin(wa) * (R - EMB), wa + sway, len, s.pre ? 'arrow_old' : 'arrow', (s.hitT || 0) > 0);
   }
   let pr = R * (1 + orbPulse * 0.06);
   if (boss && state === 'win') pr *= Math.max(0, 1 - stateT * 1.6);
   if (boss && boss.rage) pr *= 1 + 0.02 * Math.sin(tnow * 30);
   const orbImg = boss ? IMG['boss' + (boss.idx + 1)] : IMG['orb' + (themeIndex() + 1)];
-  if (orbImg && pr > 0) {
+  if (!boss && pr > 0) drawLiveOrb(orbImg, pr, lv.c);
+  else if (orbImg && pr > 0) {
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
     const oh = pr * 2 * (orbImg.height / orbImg.width); ctx.drawImage(orbImg, -pr, -oh / 2, pr * 2, oh); ctx.restore();
   } else if (pr > 0) {
@@ -166,10 +164,10 @@ function drawPlay() {
   if (!boss) { // küre ortasında bölüm adı
     ctx.font = `900 ${Math.round(R * (lv.kind === 'bonus' ? 0.32 : 0.46))}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const label = lv.kind === 'bonus' ? 'BONUS' : lv.id;
-    ctx.lineWidth = R * 0.06; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.strokeText(label, cx, cy + R * 0.04);
-    ctx.fillStyle = 'rgba(25,12,35,0.88)'; ctx.fillText(label, cx, cy + R * 0.04);
+    ctx.lineJoin = 'round'; ctx.lineWidth = R * 0.08; ctx.strokeStyle = 'rgba(26,16,48,0.85)'; ctx.strokeText(label, cx, cy + R * 0.04);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(label, cx, cy + R * 0.04);
   }
-  for (const p of flying) drawPin(cx, p.y, Math.PI / 2, L + R * 0.1);
+  for (const p of flying) drawPin(cx, p.y, Math.PI / 2, L + EMB);
   for (const b of bounced) { ctx.save(); ctx.globalAlpha = Math.max(0, b.life); drawPin(b.x + Math.cos(b.r - Math.PI / 2) * L / 2, b.y + Math.sin(b.r - Math.PI / 2) * L / 2, b.r + Math.PI / 2, L); ctx.restore(); }
   drawFx();
   ctx.restore();
@@ -231,8 +229,8 @@ function drawPlayHud(th) {
   coinPill(right, top + 50, 26, P.gold);
 
   // alt: sıradaki iğne ve kalan sayı
-  if (active && pinsLeft > 0) drawPin(cx, LAUNCH_Y, Math.PI / 2, L + R * 0.1);
-  if (active) text(`× ${pinsLeft}`, cx + HEAD * 3.2, LAUNCH_Y + L * 0.5, m * 0.05, th.accent, 900, 'left');
+  if (active && pinsLeft > 0) drawPin(cx, LAUNCH_Y, Math.PI / 2, L + EMB);
+  if (active) text(`× ${pinsLeft}`, cx + R * 0.16, LAUNCH_Y + L * 0.5, m * 0.05, th.accent, 900, 'left');
 
   // jokerler
   if (active && lv.kind !== 'bonus' && !paused && !overlay) {

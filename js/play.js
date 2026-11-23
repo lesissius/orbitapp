@@ -17,18 +17,18 @@ function layout() {
   const cs = getComputedStyle(document.getElementById('safe'));
   SAFE = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0 };
   const s = Math.min(W, H * 0.62);
-  // büyük küre, düz ve biraz kısa iğneler: küre + iğneler ekrana sığar
-  R = s * (W < 500 ? 0.235 : 0.21); L = R * 0.95; HEAD = Math.max(4, R * 0.05);
+  // büyük küre; okların ucu küreye gömülür (EMB), dışarıda gövde ve tüyler (L) görünür
+  R = s * (W < 500 ? 0.29 : 0.26); L = R * 0.62; EMB = R * 0.18; HEAD = Math.max(4, R * 0.05);
   cx = W / 2;
   LAUNCH_Y = Math.min(H * 0.8, H - SAFE.bottom - L - 40);
   // üstteki bilgi alanına (≈120 px) girmesin, alttaki atış noktasına da yaklaşmasın
   cy = Math.max(H * 0.37 + SAFE.top * 0.5, SAFE.top + 118 + R + L);
   cy = Math.min(cy, LAUNCH_Y - (R + L) - 24);
 }
-GAP = 0.085; // iki iğne arası en az açı (düz iğnelerin görünen kalınlığına yakın); ekrandan bağımsız, seviyeler her cihazda aynı
+GAP = 0.085; // iki ok arası en az açı (tüylerin görünen genişliğine yakın); ekrandan bağımsız, seviyeler her cihazda aynı
 
 function startLevel(node) {
-  curNode = node; lv = makeLevel(node);
+  curNode = node; lv = makeLevel(node); needChapterArt(node.c);
   // küredeki altın para yalnızca bölüm ilk kez geçilene kadar çıkar (tekrar oynayarak altın kasılmasın)
   if (lv.kind !== 'bonus' && P.coins[node.id]) lv.targets = lv.targets.filter(x => x.kind !== 'coin');
   screen = 'play'; paused = false; overlay = null;
@@ -206,6 +206,7 @@ function finishLevel(timeUp) {
 function update(dt) {
   stateT += dt;
   if (screen !== 'play') { rot = norm(rot + 0.6 * dt); updateFx(dt); return; }
+  if (!paused) sceneUpdate(dt, lv.c);
   if (state === 'play' || state === 'win') {
     gameT += dt;
     const w = state === 'win' ? angularVelocity() * (1 + stateT * 6) : angularVelocity();
@@ -278,7 +279,7 @@ function update(dt) {
       addPopup(t('pop_clash'), tipX, cy + R + L + 30, '#ff8da1');
       checkEnd(); continue;
     }
-    stuck.push({ a, born: 1 }); stuckCount++;
+    stuck.push({ a, born: 1, wob: 1 }); stuckCount++; sceneKick(a);
     orbPulse = 0.5;
     sfx.stick(stuckCount);
     addFx('fx_spark', tipX, tipY, R * 0.25, R * 0.9, 0.22, Math.random());
@@ -309,7 +310,7 @@ function update(dt) {
     b.vy += 2200 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt; b.life -= dt;
     if (b.life <= 0) bounced.splice(i, 1);
   }
-  for (const s of stuck) { if (s.born) s.born = Math.max(0, s.born - dt * 6); if (s.hitT) s.hitT = Math.max(0, s.hitT - dt); }
+  for (const s of stuck) { if (s.wob) s.wob *= Math.exp(-dt * 6); if (s.born) s.born = Math.max(0, s.born - dt * 6); if (s.hitT) s.hitT = Math.max(0, s.hitT - dt); }
   updateFx(dt);
 }
 function updateFx(dt) {

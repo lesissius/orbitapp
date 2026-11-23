@@ -238,3 +238,72 @@ for (let i = 1; i <= 6; i++) {
   await sharp(src).resize(768, 1152, { fit: 'cover' }).webp({ quality: 82 }).toFile(out(`bg${i}.webp`));
   console.log('bg' + i);
 }
+
+// ---------- Oklar (2×1, yeşil perde) → assets/arrow.png, arrow_old.png ----------
+if (existsSync(art('arrows.png'))) {
+  const { data, info } = await sharp(art('arrows.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], m = Math.max(r, b);
+    if (g > 120 && g > m * 1.35) { px[i + 3] = 0; continue; }
+    if (g > m) { px[i + 1] = m; px[i + 3] = Math.round(px[i + 3] * 0.7); }
+  }
+  const half = Math.floor(info.width / 2);
+  for (const [k, name] of ['arrow', 'arrow_old'].entries()) {
+    const buf = await sharp(px, { raw: { width: info.width, height: info.height, channels: 4 } }).extract({ left: k * half, top: 0, width: half, height: info.height }).png().toBuffer();
+    await sharp(await sharp(buf).trim({ threshold: 1 }).png().toBuffer()).resize({ height: 384, withoutEnlargement: true }).png().toFile(out(name + '.png'));
+    console.log(name);
+  }
+}
+
+// ---------- 20 kısmın temalı küreleri: art/orbs_theme_a..g.png (3×1, yeşil ya da mavi perde) → assets/orb1..orb20.png ----------
+// Perde yalnızca kenardan ulaşılan yerde silinir; küre içindeki aynı renkli ayrıntılar korunur.
+async function cutKeyed(file, key, cols) {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data), w = info.width, h = info.height;
+  const isKey = (i) => { const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+    return key === 'green' ? g > 110 && g > Math.max(r, b) * 1.35 : b > 110 && b > Math.max(r, g) * 1.45; };
+  const seen = new Uint8Array(w * h), st = [];
+  for (let x = 0; x < w; x++) st.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) st.push(y * w, y * w + w - 1);
+  while (st.length) { const i = st.pop(); if (seen[i] || !isKey(i)) continue; seen[i] = 1; px[i * 4 + 3] = 0;
+    const x = i % w, y = (i / w) | 0; if (x > 0) st.push(i - 1); if (x < w - 1) st.push(i + 1); if (y > 0) st.push(i - w); if (y < h - 1) st.push(i + w); }
+  for (let i = 0; i < w * h; i++) {
+    if (seen[i]) continue; const x = i % w, y = (i / w) | 0;
+    if (!((x > 0 && seen[i - 1]) || (x < w - 1 && seen[i + 1]) || (y > 0 && seen[i - w]) || (y < h - 1 && seen[i + w]))) continue;
+    const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+    if (key === 'green' && g > Math.max(r, b)) { px[i * 4 + 1] = Math.max(r, b); px[i * 4 + 3] = Math.round(px[i * 4 + 3] * 0.6); }
+    if (key === 'blue' && b > Math.max(r, g)) { px[i * 4 + 2] = Math.max(r, g); px[i * 4 + 3] = Math.round(px[i * 4 + 3] * 0.6); }
+  }
+  const cw = Math.floor(w / cols), outs = [];
+  for (let k = 0; k < cols; k++) {
+    const cell = await sharp(px, { raw: { width: w, height: h, channels: 4 } }).extract({ left: k * cw, top: 0, width: cw, height: h }).png().toBuffer();
+    outs.push(await sharp(cell).trim({ threshold: 1 }).png().toBuffer());
+  }
+  return outs;
+}
+const ORB_SHEETS = [ // [dosya, perde, sıradaki üç kürenin kısım numaraları]
+  ['orbs_theme_a.png', 'green', [1, 2, 5]], ['orbs_theme_b.png', 'blue', [3, 4, 6]],
+  ['orbs_theme_c.png', 'green', [7, 8, 9]], ['orbs_theme_d.png', 'blue', [10, 11, 12]],
+  ['orbs_theme_e.png', 'green', [13, 14, 15]], ['orbs_theme_f.png', 'green', [16, 17, 18]],
+  ['orbs_theme_g.png', 'green', [19, 20, 0]],
+];
+for (const [file, key, chapters] of ORB_SHEETS) {
+  if (!existsSync(art(file))) { console.log('atlandı:', file); continue; }
+  const cells = await cutKeyed(art(file), key, 3);
+  for (const [k, c] of chapters.entries()) {
+    if (!c) continue;
+    await sharp(cells[k]).resize(560, 560, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png({ compressionLevel: 9 }).toFile(out(`orb${c}.png`));
+    console.log('orb' + c);
+  }
+}
+
+// ---------- Kısım arka planları (konsept çizimleri): art/concept/bgN_*.png → assets/bgN.webp ----------
+import { readdirSync } from 'node:fs';
+if (existsSync(art('concept'))) {
+  for (const f of readdirSync(art('concept'))) {
+    const m = /^bg(\d+)_.*\.png$/.exec(f); if (!m) continue;
+    await sharp(art('concept/' + f)).resize(768, 1152, { fit: 'cover' }).webp({ quality: 80 }).toFile(out(`bg${m[1]}.webp`));
+    console.log('bg' + m[1], '(konsept)');
+  }
+}

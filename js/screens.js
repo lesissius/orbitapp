@@ -37,7 +37,7 @@ function drawTitle() {
   const bg = IMG.bg1; if (bg) drawCover(bg, 0.1); else { ctx.fillStyle = '#1b1640'; ctx.fillRect(0, 0, W, H); }
   glowAt(cx, cy, R * 4.2, '#ffb84d55');
   const orb = IMG.orb1;
-  for (let k = 0; k < 4; k++) { const wa = rot + k * TAU / 4 + 0.3; drawPin(cx + Math.cos(wa) * R * 0.9, cy + Math.sin(wa) * R * 0.9, wa, L + R * 0.1); }
+  for (let k = 0; k < 4; k++) { const wa = rot + k * TAU / 4 + 0.3; drawPin(cx + Math.cos(wa) * (R - EMB), cy + Math.sin(wa) * (R - EMB), wa, L + EMB); }
   if (orb) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.drawImage(orb, -R, -R, R * 2, R * 2); ctx.restore(); }
   const lw0 = Math.min(W * 0.74, 460); // Orbitapp logosu (yüklenemezse yazı)
   if (!sprite('logo', cx, H * 0.615, IMG.logo ? lw0 * IMG.logo.height / IMG.logo.width : 0)) text(BRAND.toLocaleUpperCase(LANG), cx, H * 0.64, m * 0.1, '#fff', 900);
@@ -76,6 +76,7 @@ function scrollToCurrent() {
 }
 
 function drawMap() {
+  needChapterArt(viewChapter);
   const m = Math.min(W, H), c = viewChapter, open = chapterOpen(c), tnow = now();
   const bg = IMG['map' + ((c - 1) % 3 + 1)];
   if (bg) drawCover(bg, 0.05); else { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#5aa8ff'); g.addColorStop(1, '#bfe6ff'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
@@ -159,7 +160,7 @@ function drawMap() {
   iconButton('shop', right - 44, top - 2, 44, () => openMarket(), '$');
   const ny = top + 64;
   iconButton(null, left, ny - 18, 36, c > 1 ? () => { viewChapter--; scrollToCurrent(); } : null, '‹', c <= 1);
-  iconButton(null, right - 36, ny - 18, 36, c <= maxOpenChapter() ? () => { viewChapter++; scrollToCurrent(); } : null, '›', c > maxOpenChapter());
+  iconButton(null, right - 36, ny - 18, 36, c < MAX_CHAPTER && c <= maxOpenChapter() ? () => { viewChapter++; scrollToCurrent(); } : null, '›', c >= MAX_CHAPTER || c > maxOpenChapter());
   text(t('chapter_caps', { n: c }), cx, ny - 8, m * 0.05, '#fff', 900);
   text(`${chapterName(c)}  ·  ★ ${chapterStars(c)} / 30`, cx, ny + 16, m * 0.032, '#ffd34d', 800);
 
@@ -326,6 +327,7 @@ function drawMilestone(m) {
     text(label, x, py + 330, 15, '#fff', 900);
   });
   if (ready) textButton(t('claim'), px + 30, py + ph - 66, pw - 60, 48, () => claimMilestone(c), '#58d68d', '#0b2015');
+  else if (claimed && c >= MAX_CHAPTER) textButton(t('ok'), px + 30, py + ph - 66, pw - 60, 48, () => closeOverlay(), '#ffb84d');
   else if (claimed) textButton(t('go_chapter', { n: c + 1 }), px + 30, py + ph - 66, pw - 60, 48, () => { viewChapter = c + 1; closeOverlay(); scrollToCurrent(); }, '#7aa7ff', '#0d1430');
   else textButton(t('ok'), px + 30, py + ph - 66, pw - 60, 48, () => closeOverlay(), '#ffb84d');
 }
@@ -334,7 +336,9 @@ function claimMilestone(c) {
   P.ms[c] = true; P.gold += r.gold;
   for (const k of ['slow', 'pins2', 'time15']) P.skills[k] = (P.skills[k] || 0) + (r[k] || 0);
   saveProgress(); sfx.win();
-  overlay = null; viewChapter = c + 1; scrollToCurrent();
+  overlay = null;
+  if (c >= MAX_CHAPTER) { showToast(t('all_done')); return; }
+  viewChapter = c + 1; scrollToCurrent(); needChapterArt(c + 1);
   showToast(t('chapter_unlocked', { n: c + 1 }));
 }
 
