@@ -1,6 +1,6 @@
 // Çevrimdışı oynama: oyun dosyaları ilk açılışta önbelleğe alınır.
-// Oyun güncellenince VERSION'u artırın; eski önbellek silinir.
-const VERSION = 'igne-v7';
+// Oyun güncellenince VERSION'u ve index.html içindeki ?v= sayısını artırın; eski önbellek silinir.
+const VERSION = 'igne-v8';
 const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
   'orb1', 'orb2', 'orb3', 'orb4', 'orb5', 'orb6', 'boss1', 'boss2', 'boss3',
   'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home',
@@ -26,8 +26,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   const fresh = req.mode === 'navigate' || url.pathname.endsWith('.js') || url.pathname.endsWith('.html') || url.pathname.endsWith('/');
   if (fresh) {
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return r; })
-      .catch(() => caches.match(req).then(hit => hit || caches.match('index.html'))));
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return r; })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || caches.match('index.html'))));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
