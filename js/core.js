@@ -233,9 +233,11 @@ const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom',
   'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_settings', 'ui_hand', 'ui_trophy', 'ui_home', 'logo',
   'bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin',
   'sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'];
-for (const n of SPRITES) { const im = new Image(); im.onload = () => { IMG[n] = im; }; im.src = `assets/${n}.png`; }
-for (let i = 1; i <= 6; i++) { const im = new Image(); im.onload = () => { IMG['bg' + i] = im; }; im.src = `assets/bg${i}.webp`; }
-for (let i = 1; i <= 3; i++) { const im = new Image(); im.onload = () => { IMG['map' + i] = im; }; im.src = `assets/map${i}.webp`; }
+// Görsel sürümü: bir görsel değişince artırılır (sw.js içindeki ASSET_V ile aynı), önbellek eski görseli vermez
+const ASSET_V = 12;
+for (const n of SPRITES) { const im = new Image(); im.onload = () => { IMG[n] = im; }; im.src = `assets/${n}.png?v=${ASSET_V}`; }
+for (let i = 1; i <= 6; i++) { const im = new Image(); im.onload = () => { IMG['bg' + i] = im; }; im.src = `assets/bg${i}.webp?v=${ASSET_V}`; }
+for (let i = 1; i <= 3; i++) { const im = new Image(); im.onload = () => { IMG['map' + i] = im; }; im.src = `assets/map${i}.webp?v=${ASSET_V}`; }
 
 // ---------- yardımcılar ----------
 function mulberry32(a) {

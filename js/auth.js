@@ -65,7 +65,7 @@ function showAuth(mode, opts = {}) {
   const terms = `<a href="${privacyUrl()}" target="_blank" rel="noopener">${esc(t('au_terms_link'))}</a>`;
   let html = '';
   if (mode === 'welcome') {
-    html = `${langSwitch()}<img class="wordmark" src="assets/logo.png" alt="${esc(BRAND)}">
+    html = `${langSwitch()}<img class="wordmark" src="assets/logo.png?v=${ASSET_V}" alt="${esc(BRAND)}">
       <p>${esc(t('au_intro'))}</p>
       <button class="green" data-a="register">${esc(t('create_account'))}</button>
       <button class="blue" data-a="login">${esc(t('login'))}</button>
