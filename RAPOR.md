@@ -119,10 +119,12 @@ Hangi görselin hangi istemle üretildiği `art/KAYNAK.md` dosyasında.
   - +2 İğne: bölüme 2 iğne ekler.
   - +15 Saniye: yalnızca süreli bölümlerde kullanılır.
   - Kullandıkça hakkı azalıyor. Hakkı kalmayan jokere dokununca market açılıyor. Yeni oyuncu 2 adet +2 İğne ile başlıyor.
-- **Altın:**
-  - İlk geçişte 10 + yıldız başına 5 altın, boss'ta +25.
-  - Yıldızı artırınca fark kadar ödül; tekrar oynayınca 2 altın.
-  - Küredeki altın paralar +10 altın.
+- **Altın** (23 Kasım'da düşürüldü; bir joker için 3–4 bölüm biriktirmek gerekir):
+  - İlk geçişte 4 + yıldız başına 3 altın (1★ 7, 2★ 10, 3★ 13), boss'ta +10.
+  - Yıldızı artırınca yeni yıldız başına 3 altın; tekrar oynayınca 1 altın. 3 yıldızla erken bitince artan her iğne 1 altın.
+  - Küredeki altın para +5, bonus altın yağmurunda para başına 4 (+10 tamamlama), mihenk taşında 30 + kısım×10.
+  - Joker fiyatları: Yavaşlat 50, +2 İğne 45, +15 Saniye 40; üçlü paket 2,5 katı.
+  - Ortalama oyuncu bir bölümden yaklaşık 12–13 altın kazanıyor; bir joker 3,1–3,9 bölüm.
 - **Market:** Jokerler altınla tek tek ya da üçlü paket olarak alınıyor. Gerçek parayla altın paketleri (500 / 1500 / 4000) görünüyor ama ödeme henüz bağlı değil; dokununca "uygulama mağazaya çıkınca açılacak" yazıyor. Fiyatlar örnek.
 
 ## Doğrulama
