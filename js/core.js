@@ -47,20 +47,22 @@ function chapterNodes(c) {
 }
 
 // ---------- ilerleme ----------
-const DEFAULT_PROGRESS = { stars: {}, bonus: {}, ms: {}, gold: 0, skills: { slow: 0, pins2: 2, time15: 0 }, seen: {}, tutorial: false, lastId: '1-1' };
+// coins: toplanan altın paralar (bölümde 1 kez, bonusta en fazla 6) — sunucu altını bunlardan doğrular
+const DEFAULT_PROGRESS = { stars: {}, bonus: {}, ms: {}, coins: {}, gold: 0, skills: { slow: 0, pins2: 2, time15: 0 }, seen: {}, tutorial: false, lastId: '1-1' };
 // Altın + jokerlerin değeri, oyunda kazanılabilecek en yüksek değeri aşamaz (sunucu da aynı kontrolü yapar).
-const STAR_GOLD = [0, 3, 8, 12], SKILL_VALUE = 85;
+const STAR_GOLD = [0, 3, 8, 12], SKILL_VALUE = 85, COIN_GOLD = 2;
 function earnedValue(p) {
   let v = 2 * SKILL_VALUE;
-  for (const s of Object.values(p.stars)) v += (STAR_GOLD[s] || 0) + 2;
+  for (const s of Object.values(p.stars)) v += STAR_GOLD[s] || 0;
+  for (const [id, n] of Object.entries(p.coins)) v += id.endsWith('-B') ? n * COIN_GOLD : COIN_GOLD;
   for (const [c, ok] of Object.entries(p.ms)) if (ok) { const r = milestoneReward(Number(c)); v += r.gold + (r.slow + r.pins2 + r.time15) * SKILL_VALUE; }
-  for (const [id, ok] of Object.entries(p.bonus)) if (ok) v += parseInt(id, 10) % 2 ? 18 : 3 * SKILL_VALUE;
+  for (const [id, ok] of Object.entries(p.bonus)) if (ok) v += parseInt(id, 10) % 2 ? 6 : 3 * SKILL_VALUE;
   return v;
 }
 function normalizeProgress(raw) {
   const p = Object.assign(JSON.parse(JSON.stringify(DEFAULT_PROGRESS)), raw || {});
   p.skills = Object.assign({ slow: 0, pins2: 0, time15: 0 }, p.skills);
-  for (const k of ['stars', 'bonus', 'ms', 'seen']) if (!p[k] || typeof p[k] !== 'object') p[k] = {};
+  for (const k of ['stars', 'bonus', 'ms', 'seen', 'coins']) if (!p[k] || typeof p[k] !== 'object') p[k] = {};
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   // eski sürümlerin cömert ekonomisinden kalan fazlalık kırpılır (önce altın, sonra jokerler)
   let over = p.gold + SKILL_VALUE * (p.skills.slow + p.skills.pins2 + p.skills.time15) - earnedValue(p);

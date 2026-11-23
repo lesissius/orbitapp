@@ -22,8 +22,8 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
-// Test kancası (konsoldan): __igne.sim('1-3'), __igne.start('2-10'), __igne.P
-window.__igne = {
+// Test kancası yalnızca bu bilgisayarda (localhost) açılır; yayındaki oyunda hile kolaylığı olmasın
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__igne = {
   get state() { return { screen, state, id: lv && lv.id, pinsLeft, stuckCount, timeLeft: lv && lv.timeLimit ? +timeLeft.toFixed(1) : null, paused, overlay: overlay && overlay.type }; },
   get P() { return P; },
   start(id) { startLevel(findNode(id)); },

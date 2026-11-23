@@ -186,3 +186,78 @@ Eski ilerleme yeni yapıya taşınıyor: geçilen seviyeler 1 yıldızla işaret
 - Google Play ve App Store ödeme makbuzlarını sunucuda doğrulamak.
 - Gizlilik politikası (KVKK): hangi verinin tutulduğu, nasıl silineceği.
 - Uygulamada "Apple ile giriş" ve "Google ile giriş" seçenekleri.
+
+---
+
+# Sürüm 4: oyuncu ve saldırgan gözüyle inceleme
+
+23 Kasım 2026
+
+## Saldırgan gözüyle: bulunan açıklar ve durumu
+
+Sunucuya yerelde gerçek saldırı istekleri gönderildi. Önce 7 açık tespit edildi, düzeltmeden sonra hepsi kapandı. Canlı sunucuda da kendini temizleyen kısa bir kontrol yapıldı.
+
+| # | Açık | Önce | Sonra |
+|---|---|---|---|
+| 1 | Sahte ilerleme: 50 kısmı 3 yıldızlı gösterip binlerce altın ve 150 joker tek seferde yazmak | Kabul ediliyordu | Reddediliyor |
+| 2 | Misafirin, istemcideki engeli atlayıp sunucuda joker "satın alması" | Mümkündü | Reddediliyor |
+| 3 | Hiç açılmamış bölümün (ör. 5-10) yıldızını yazmak | Mümkündü | Reddediliyor |
+| 4 | İlerlemeye keyfi veri ve kod parçası gömmek | Saklanıyordu | Yalnızca bilinen alanlar saklanıyor |
+| 5 | Tek IP'den sınırsız misafir hesabı açmak | 40/40 | Saatte 15 |
+| 6 | "admin", "Destek", "moderator", "admın", "4dm1n" gibi yetkili görünen adlar | Alınabiliyordu | Reddediliyor |
+| 7 | "123456" gibi çok yaygın şifreler | Kabul ediliyordu | Reddediliyor |
+| 8 | Saniyeler içinde 10 bölüm geçilmiş göstermek | — | Reddediliyor |
+| 9 | Hatalı giriş süresinden kullanıcı adının var olup olmadığını anlamak | Fark yoktu | Olmayan adda da aynı şifre hesabı yapılıyor |
+
+## Sunucuda yapılanlar
+
+- **İlerleme dört kontrolden geçiyor:**
+  1. Biçim: yalnızca bilinen alanlar ve türler saklanıyor.
+  2. Sıra: kilitli bölüm, kısım, bonus ya da mihenk taşı yazılamıyor.
+  3. Değer: altın ve jokerler kazanılabilecek değeri aşamıyor, iki kayıt arasındaki artış da kazanılan kadar olabiliyor.
+  4. Hız: kısa sürede çok bölüm geçilmiş görünemiyor (3 + her 4 saniyede 1).
+- **Misafir:** Jokerleri yalnızca oyunun verdiği kadar artabiliyor; satın alma sunucuda da engelli.
+- **İstek sınırları:**
+  - Misafir hesabı açma: IP başına saatte 15.
+  - Kayıt: IP başına saatte 6.
+  - Hatalı giriş: IP + kullanıcı adı için 15 dakikada 8, kullanıcı adı için saatte 20, IP için 15 dakikada 40.
+  - Kayıt gönderme: hesap başına 10 dakikada 120.
+  - Hesap silmede hatalı şifre denemesi de sınırlı.
+- **Kullanıcı adı:**
+  - Büyük/küçük harf ve Türkçe harf farkı benzersizlikte yok sayılıyor ("Admın" = "admin").
+  - Yetkili gibi görünen adlar ve küfür/nefret içeren adlar reddediliyor. Filtre, harf yerine rakam yazılmasını da yakalıyor ("4dm1n").
+- **Şifre:** Çok yaygın şifreler, tek karakter tekrarı, 7 haneye kadar yalnız rakam ve kullanıcı adını içeren şifre reddediliyor.
+- **Kişisel veri (KVKK):** IP adresi artık açık saklanmıyor; yalnızca gizli tuzla alınmış özeti en fazla 2 gün tutuluyor. Eskiden IP'yi açık tutan tablo kaldırıldı.
+- **Günlük temizlik (her gün 03:17 UTC):** Süresi dolan oturumlar, eski sayaçlar ve 120 gün girmeyen misafir hesapları siliniyor.
+- **Güvenlik başlıkları:** nosniff, no-store, no-referrer, DENY. Kayıt için şart onayı sunucuda da zorunlu.
+
+## Oyun tarafında yapılanlar
+
+- **Test kancası** (`__igne`: bölümü bitirme, botu çalıştırma) yalnızca bu bilgisayarda açılıyor; yayındaki oyunda yok.
+- **İçerik Güvenliği Politikası (CSP):** Sayfa yalnızca kendi dosyalarını ve hesap sunucusunu yükleyebiliyor.
+- **Altın para:** Hesap başına bölümde bir kez veriliyor. Eskiden bölümü kaybedip tekrar oynayarak para toplanabiliyordu. Bonus parası, bonus bitince bir kez yazılıyor.
+- **Ret durumu:** Sunucu bir kaydı reddederse oyun son geçerli kayda dönüyor ve oyuncuya söylüyor.
+- **Bulunup düzeltilen hata:** Misafirken arka planda bir kayıt beklerken hesap oluşturulursa, eski anahtarla giden kayıt yüzünden yeni hesapta "Oturumun sona erdi" çıkıyordu. Giriş, kayıt, çıkış ve silme artık arka plan kaydıyla çakışmıyor.
+- **Satış yokken fiyat göstermemek:** Gerçek para fiyatları kaldırıldı, "Yakında" yazıyor; satış yokken fiyat göstermek yanıltıcı olabilirdi.
+- **Gizlilik politikası ve kullanım şartları:** `privacy.html`. Hangi verinin tutulduğu, saklama süresi, hesap silme ve adil oyun kuralları burada. Kayıtta onay kutusu var. İletişim için kişisel bilgi yerine GitHub "Issues" sayfası gösteriliyor.
+
+## Oyuncu gözüyle yapılanlar
+
+- **Misafir hatırlatması:** 6 yıldıza ulaşan misafire günde en fazla bir kez "İlerlemeni koru" penceresi çıkıyor; kaç yıldız ve altını olduğunu gösteriyor.
+- **Kayıt durumu:** Haritada ayar düğmesinin yanında küçük bir işaret var: yeşil kayıtlı, sarı kaydediliyor, gri çevrimdışı, kırmızı hata.
+- **Giriş ve kayıt formu:** "Şifreyi göster" seçeneği var.
+- **Ayarlar:** Gizlilik politikası ve şartlar bağlantısı var.
+
+## Doğrulama
+
+- Yerelde normal akışın 18 kontrolü ve saldırıların 9 kontrolü geçti.
+- Oyunun içinden bir misafir 10 bölüm, mihenk taşı, bonus ve 2. kısmı gerçek tempoda oynadı; 14 kaydın hepsi kabul edildi.
+- Oyunun içinden yapılan hile denemeleri reddedildi: misafirin altını jokere çevirmesi ve altını elle artırmak. Hesap açtıktan sonra normal satın alma kabul edildi.
+- Canlı sunucuda 10 kontrol geçti; test hesapları silindi.
+
+## Kalan riskler ve öneriler
+
+- **İstemci tarafında oynanış:** Oyun tarayıcıda çalıştığı için sabırlı biri, her bölümü kurallara uygun hızda "geçmiş" gibi göndererek yine ilerleyebilir. Bu yalnızca kendi hesabını etkiler. Liderlik tablosu ya da gerçek para gelmeden önce bölüm sonuçlarının sunucuda daha sıkı doğrulanması gerekir (atış zamanları gibi).
+- **Kullanıcı adı filtresi:** Basit bir listeye dayanıyor; her uygunsuz adı yakalayamaz. Adlar başkalarına gösterilmeye başlanırsa (liderlik tablosu) bildirme ve ad değiştirme gerekir.
+- **Gizlilik politikası:** Bir hukukçuya okutulmalı, özellikle uygulama mağazasına çıkmadan ve gerçek para eklenmeden önce.
+- **Cloudflare ücretsiz katman:** Günde 100.000 istek ve D1 yazma sınırı var. Oyun büyürse aşılabilir; bu durumda istekler reddedilir ama ücret çıkmaz.

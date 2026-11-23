@@ -26,7 +26,7 @@ GAP = 2 * Math.asin(0.13 / 2.25) + 0.012; // açısal boşluk ekrandan bağıms�
 function startLevel(node) {
   curNode = node; lv = makeLevel(node);
   // küredeki altın para yalnızca bölüm ilk kez geçilene kadar çıkar (tekrar oynayarak altın kasılmasın)
-  if (lv.kind !== 'bonus' && starsOf(node.id) > 0) lv.targets = lv.targets.filter(x => x.kind !== 'coin');
+  if (lv.kind !== 'bonus' && P.coins[node.id]) lv.targets = lv.targets.filter(x => x.kind !== 'coin');
   screen = 'play'; paused = false; overlay = null;
   rot = 0; t = 0; dirMul = 1;
   stuck = lv.pre.map(a => ({ a, pre: true }));
@@ -148,12 +148,14 @@ function finishLevel(timeUp) {
   if (lv.kind === 'bonus') {
     const first = !P.bonus[lv.id];
     let gold = 0; const skills = {};
-    if (first) {
-      gold = coinsRun + (lv.targets.every(x => x.taken) ? 6 : 0);
+    if (first) { // bonus ödülü bonus bitince bir kez verilir (yarıda bırakılınca hiçbir şey yazılmaz)
+      const coinsHit = lv.targets.filter(x => x.kind === 'coin' && x.taken).length;
+      gold = coinsHit * COIN_GOLD + (lv.btype === 'gold' ? 6 : 0);
+      if (lv.btype === 'gold') P.coins[lv.id] = coinsHit;
       Object.assign(skills, giftsRun);
       P.bonus[lv.id] = true;
     }
-    P.gold += Math.max(0, gold - coinsRun); // paralar vuruldukça zaten eklendi
+    P.gold += gold;
     for (const k in skills) P.skills[k] = (P.skills[k] || 0) + skills[k];
     saveProgress();
     result = { win: true, bonus: true, stars: 0, gold, skills, first };
@@ -286,7 +288,10 @@ function update(dt) {
       tg.taken = true;
       addFx('fx_gold', tipX, tipY, R * 0.5, R * 2.4, 0.6, 0, 1);
       burst(tipX, tipY, '#ffd34d', 20, 320, 0.7, 3);
-      if (tg.kind === 'coin') { coinsRun += tg.value; P.gold += tg.value; saveProgress(); sfx.coin(); addPopup(`+${tg.value} ALTIN`, tipX, tipY + 50, '#ffd34d'); }
+      if (tg.kind === 'coin') {
+        coinsRun += tg.value; sfx.coin(); addPopup(`+${tg.value} ALTIN`, tipX, tipY + 50, '#ffd34d');
+        if (lv.kind !== 'bonus' && !P.coins[lv.id]) { P.coins[lv.id] = 1; P.gold += tg.value; saveProgress(); } // bölüm parası hesap başına bir kez
+      }
       else { const keys = Object.keys(SKILL_INFO), k = keys[Math.floor(Math.random() * keys.length)]; giftsRun[k] = (giftsRun[k] || 0) + 1; sfx.skill(); addPopup(SKILL_INFO[k].name.toUpperCase(), tipX, tipY + 50, '#7dff9a'); }
     }
     if (lv.boss) {

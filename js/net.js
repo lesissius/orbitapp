@@ -44,28 +44,41 @@ async function startGuest() {
   }
   return { ok: false, error: r.data.error || 'Misafir hesabı açılamadı' };
 }
-async function register(username, password) {
-  if (ACCOUNT && ACCOUNT.guest) { await ensureServerGuest(); await pushProgress(true); }
+// Giriş/kayıt/çıkış sırasında arka plan kaydını durdurur, süren kaydın bitmesini bekler
+async function exclusive(fn) {
+  clearTimeout(pushTimer); authBusy = true;
+  while (pushing) await new Promise((r) => setTimeout(r, 50));
+  try { return await fn(); } finally { authBusy = false; }
+}
+const register = (u, p) => exclusive(() => registerImpl(u, p));
+const login = (u, p) => exclusive(() => loginImpl(u, p));
+const logout = () => exclusive(() => logoutImpl());
+async function registerImpl(username, password) {
+  if (ACCOUNT && ACCOUNT.guest) { await ensureServerGuest(); await pushProgress(true, false, true); }
   const token = ACCOUNT && ACCOUNT.guest && !ACCOUNT.offline ? ACCOUNT.token : null;
-  const r = await api('POST', '/api/register', { username, password }, { token });
+  // hesapsız açılan yeni hesapta cihazdaki eski oyun kaydı da gönderilir (sunucu sınırlı kabul eder)
+  const seed = token ? undefined : (takeLegacyProgress(false) || undefined);
+  const r = await api('POST', '/api/register', { username, password, acceptTerms: true, progress: seed }, { token });
   if (r.status !== 200) return { ok: false, error: r.data.error || 'Kayıt olunamadı' };
+  if (seed) takeLegacyProgress(true);
   const keep = ACCOUNT && ACCOUNT.guest ? P : null; // misafirden yükseltmede ilerleme aynen kalır
   adoptAccount({ ...r.data.user, token: r.data.token }, r.data.progress || keep, r.data.version);
-  if (!r.data.progress) await pushProgress(true);
+  if (!r.data.progress) await pushProgress(true, false, true);
   return { ok: true };
 }
-async function login(username, password) {
+async function loginImpl(username, password) {
   const r = await api('POST', '/api/login', { username, password }, { token: null });
   if (r.status !== 200) return { ok: false, error: r.data.error || 'Giriş yapılamadı' };
   adoptAccount({ ...r.data.user, token: r.data.token }, r.data.progress, r.data.version);
-  if (!r.data.progress) { P = normalizeProgress(null); store.set('p2_' + ACCOUNT.id, P); await pushProgress(true); }
+  if (!r.data.progress) { P = normalizeProgress(null); store.set('p2_' + ACCOUNT.id, P); await pushProgress(true, false, true); }
   return { ok: true };
 }
-async function logout() {
-  if (ACCOUNT && ACCOUNT.token) { await pushProgress(true); await api('POST', '/api/logout'); }
+async function logoutImpl() {
+  if (ACCOUNT && ACCOUNT.token) { await pushProgress(true, false, true); await api('POST', '/api/logout'); }
   ACCOUNT = null; saveAccount(); P = normalizeProgress(null);
 }
-async function deleteAccount(password) {
+const deleteAccount = (pw) => exclusive(() => deleteAccountImpl(pw));
+async function deleteAccountImpl(password) {
   if (!ACCOUNT) return { ok: false, error: 'Hesap yok' };
   if (!ACCOUNT.offline) {
     const r = await api('DELETE', '/api/account', ACCOUNT.guest ? {} : { password });
@@ -95,13 +108,18 @@ function schedulePush() {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => pushProgress(), 1500);
 }
-async function pushProgress(force = false, keepalive = false) {
+let authBusy = false; // giriş/kayıt sürerken arka plan kaydı bekler (eski anahtarla gidip yeni hesabı kapatmasın)
+async function pushProgress(force = false, keepalive = false, duringAuth = false) {
   if (!ACCOUNT || SIM || (!dirty && !force)) return;
+  if (authBusy && !duringAuth) { schedulePush(); return; }
   if (pushing && !keepalive) { schedulePush(); return; }
   if (ACCOUNT.offline && !(await ensureServerGuest())) { syncState = 'offline'; retryLater(); return; }
   pushing = true; syncState = 'saving';
-  const r = await api('PUT', '/api/progress', { progress: P, baseVersion: ACCOUNT.version }, { keepalive });
+  const sentFor = ACCOUNT.id, sentToken = ACCOUNT.token;
+  const r = await api('PUT', '/api/progress', { progress: P, baseVersion: ACCOUNT.version }, { keepalive, token: sentToken });
   pushing = false;
+  // istek giderken hesap değiştiyse (giriş, kayıt, çıkış) bu yanıt artık geçersiz
+  if (!ACCOUNT || ACCOUNT.id !== sentFor || ACCOUNT.token !== sentToken) return;
   if (r.status === 200) { ACCOUNT.version = r.data.version; saveAccount(); dirty = false; syncState = 'idle'; return; }
   if (r.status === 409) { // başka cihazda daha yeni ilerleme var: o yüklenir
     P = normalizeProgress(r.data.progress); ACCOUNT.version = r.data.version; saveAccount();
@@ -110,7 +128,14 @@ async function pushProgress(force = false, keepalive = false) {
     return;
   }
   if (r.status === 401) { syncState = 'error'; ACCOUNT.token = null; saveAccount(); if (typeof sessionExpired === 'function') sessionExpired(); return; }
-  if (r.status === 0) { syncState = 'offline'; retryLater(); return; }
+  if (r.status === 0 || r.status === 429 || r.status >= 500) { syncState = 'offline'; retryLater(); return; }
+  if (r.status === 422) { // sunucu kaydı doğrulayamadı: sunucudaki son geçerli kayıt yüklenir
+    console.warn('İlerleme reddedildi:', r.data.error);
+    P = normalizeProgress(r.data.progress); ACCOUNT.version = r.data.version || ACCOUNT.version; saveAccount();
+    store.set('p2_' + ACCOUNT.id, P); dirty = false; syncState = 'idle'; viewChapter = maxOpenChapter();
+    if (typeof showToast === 'function') showToast('İlerleme doğrulanamadı, son geçerli kayıt yüklendi');
+    return;
+  }
   syncState = 'error'; console.warn('İlerleme kaydedilemedi:', r.data.error);
 }
 let retryTimer = null;

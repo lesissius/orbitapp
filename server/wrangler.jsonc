@@ -14,5 +14,8 @@
     // Oyunun açıldığı adresler (virgülle ayrılır)
     "ALLOWED_ORIGINS": "https://lesissius.github.io,http://localhost:5176,http://127.0.0.1:5176"
   },
+  // Günlük temizlik (süresi dolan oturumlar, eski sayaçlar, 120 gün girmeyen misafirler)
+  "triggers": { "crons": ["17 3 * * *"] },
+  // IP_SALT gizli değeri `wrangler secret put IP_SALT` ile verilir (IP'ler yalnızca tuzlanmış özet olarak tutulur)
   "observability": { "enabled": true }
 }

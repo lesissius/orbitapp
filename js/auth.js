@@ -30,6 +30,10 @@ authStyle.textContent = `
 #auth .close{position:absolute;top:10px;right:12px;width:36px;height:36px;margin:0;padding:0;border-radius:18px;
   background:rgba(255,255,255,.1);color:#fff;font-size:18px;box-shadow:none}
 #auth .small{font-size:12px;color:rgba(255,255,255,.5);text-align:center;margin-top:14px}
+#auth label.chk{display:flex;gap:10px;align-items:flex-start;font-weight:600;font-size:13px;margin:12px 0 0;cursor:pointer}
+#auth label.chk input{width:20px;height:20px;flex:none;margin:0;accent-color:#ffb84d}
+#auth a{color:#ffd34d}
+#auth .legal{font-size:12px;color:rgba(255,255,255,.5);text-align:center;margin-top:10px}
 #auth .logo{display:block;width:84px;height:84px;margin:0 auto 8px;border-radius:20px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
 `;
 document.head.appendChild(authStyle);
@@ -56,7 +60,8 @@ function showAuth(mode, opts = {}) {
       <button class="blue" data-a="login">Giriş yap</button>
       <button class="ghost" data-a="guest">Misafir olarak oyna</button>
       <div class="err"></div>
-      <div class="small">Misafir hesabıyla satın alma yapılamaz. Sonradan hesap oluşturursan ilerlemen aktarılır.</div>`;
+      <div class="small">Misafir hesabıyla satın alma yapılamaz. Sonradan hesap oluşturursan ilerlemen aktarılır.</div>
+      <div class="legal"><a href="privacy.html" target="_blank" rel="noopener">Gizlilik politikası ve kullanım şartları</a></div>`;
   } else if (mode === 'register' || mode === 'login') {
     const reg = mode === 'register', fromGuest = reg && ACCOUNT && ACCOUNT.guest;
     html = `${x}<h2>${reg ? 'Hesap oluştur' : 'Giriş yap'}</h2>
@@ -67,6 +72,8 @@ function showAuth(mode, opts = {}) {
         <label for="ap">Şifre</label>
         <input id="ap" name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="72" required>
         ${reg ? '<label for="ap2">Şifre (tekrar)</label><input id="ap2" name="password2" type="password" autocomplete="new-password" maxlength="72" required>' : ''}
+        <label class="chk"><input type="checkbox" data-a="showpw"> Şifreyi göster</label>
+        ${reg ? '<label class="chk"><input type="checkbox" name="terms"> <span><a href="privacy.html" target="_blank" rel="noopener">Gizlilik politikasını ve kullanım şartlarını</a> okudum, kabul ediyorum</span></label>' : ''}
         <button class="${reg ? 'green' : 'blue'}" type="submit">${reg ? 'Hesabı oluştur' : 'Giriş yap'}</button>
       </form>
       <div class="err"></div>
@@ -90,7 +97,9 @@ function showAuth(mode, opts = {}) {
   const setErr = (m) => { if (err) err.textContent = m || ''; };
   const busy = (on) => authRoot.querySelectorAll('button,input').forEach((el) => { el.disabled = on; });
 
-  authRoot.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', async (e) => {
+  const showPw = authRoot.querySelector('[data-a="showpw"]');
+  if (showPw) showPw.addEventListener('change', () => authRoot.querySelectorAll('input[name^="password"]').forEach((el) => { el.type = showPw.checked ? 'text' : 'password'; }));
+  authRoot.querySelectorAll('[data-a]').forEach((b) => b.dataset.a !== 'showpw' && b.addEventListener('click', async (e) => {
     e.preventDefault();
     const a = b.dataset.a;
     if (a === 'close') { closeAuth(); authAfter = null; return; }
@@ -113,6 +122,7 @@ function showAuth(mode, opts = {}) {
       const f = new FormData(form), u = String(f.get('username') || '').trim(), pw = String(f.get('password') || '');
       setErr('');
       if (mode === 'register' && pw !== String(f.get('password2') || '')) { setErr('Şifreler aynı değil'); return; }
+      if (mode === 'register' && !f.get('terms')) { setErr('Devam etmek için gizlilik politikasını ve şartları kabul et'); return; }
       busy(true);
       const r = mode === 'register' ? await register(u, pw) : mode === 'login' ? await login(u, pw) : await deleteAccount(pw);
       busy(false);

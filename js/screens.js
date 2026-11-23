@@ -136,6 +136,13 @@ function drawMap() {
   hg.addColorStop(0, 'rgba(10,8,30,0.92)'); hg.addColorStop(0.8, 'rgba(10,8,30,0.7)'); hg.addColorStop(1, 'rgba(10,8,30,0)');
   ctx.fillStyle = hg; ctx.fillRect(0, 0, W, mapHeaderH() + 20);
   iconButton('ui_settings', left, top, 40, () => { overlay = { type: 'settings' }; resetArmed = false; }, '⚙');
+  // kayıt durumu: yeşil kayıtlı, sarı kaydediliyor, gri çevrimdışı, kırmızı hata
+  if (ACCOUNT) {
+    const col = ACCOUNT.offline || syncState === 'offline' ? '#9aa0b4' : syncState === 'error' ? '#ff6b81' : syncState === 'saving' ? '#ffd34d' : '#58d68d';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(left + 38, top + 36, 8, 0, TAU); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(left + 38, top + 36, 5, 0, TAU); ctx.fill();
+  }
+  if (!overlay) maybeRemindGuest();
   coinPill(right - 58, top + 5, 32, P.gold);
   iconButton('shop', right - 44, top - 2, 44, () => openMarket(), '$');
   const ny = top + 64;
@@ -165,6 +172,7 @@ function drawOverlay() {
   if (overlay.type === 'market') drawMarket(m);
   if (overlay.type === 'settings') drawSettings(m);
   if (overlay.type === 'milestone') drawMilestone(m);
+  if (overlay.type === 'remind') drawRemind(m);
 }
 function closeX(px, py, pw) { iconButton(null, px + pw - 46, py + 10, 36, () => closeOverlay(), '✕'); }
 
@@ -192,7 +200,8 @@ function drawMarket(m) {
   }
   y += 6;
   text('ALTIN PAKETLERİ', px + 20, y + 10, 15, '#ffd34d', 900, 'left'); y += 28;
-  const packs = [['pack_s', 500, '₺29,99'], ['pack_m', 1500, '₺69,99'], ['pack_l', 4000, '₺149,99']];
+  // Gerçek para ödemesi bağlanana kadar fiyat gösterilmez (satış yokken fiyat göstermek yanıltıcı olur)
+  const packs = [['pack_s', 500, 'Yakında'], ['pack_m', 1500, 'Yakında'], ['pack_l', 4000, 'Yakında']];
   const cw = (pw - 24 - 16) / 3;
   packs.forEach(([icon, amount, price], i) => {
     const x = px + 12 + i * (cw + 8);
@@ -201,7 +210,7 @@ function drawMarket(m) {
     text(`${amount}`, x + cw / 2, y + 74, 17, '#ffd34d', 900, 'center', false);
     textButton(price, x + 8, y + 90, cw - 16, 30, () => {
       if (guestBlocked()) return;
-      showToast('Gerçek para ile satın alma, uygulama mağazaya çıkınca açılacak');
+      showToast('Altın paketleri, oyun uygulama mağazasına çıkınca açılacak');
     }, '#7aa7ff', '#0d1430');
   });
   y += 136;
@@ -209,7 +218,7 @@ function drawMarket(m) {
     text('Misafir hesapla satın alma yapılamaz.', cx, y + 4, 12, '#ffd34d', 800);
     text('Hesap oluştur, ilerlemen aynen aktarılır.', cx, y + 22, 12, '#ffd34d', 700);
   }
-  else text('Gerçek para ödemesi henüz bağlı değil, fiyatlar örnektir.', cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
+  else text('Altın paketleri, oyun uygulama mağazasına çıkınca açılacak.', cx, y + 8, 11, 'rgba(255,255,255,0.5)', 600);
 }
 // Misafirler satın alma yapamaz: hesap oluşturma ekranı açılır
 function guestBlocked() {
@@ -226,7 +235,7 @@ function buySkill(k, n, price) {
 
 function drawSettings(m) {
   const guest = !ACCOUNT || ACCOUNT.guest;
-  const pw = Math.min(W - 32, 400), ph = guest ? 400 : 344, px = cx - pw / 2, py = Math.max(SAFE.top + 16, (H - ph) / 2);
+  const pw = Math.min(W - 32, 400), ph = guest ? 446 : 372, px = cx - pw / 2, py = Math.max(SAFE.top + 16, (H - ph) / 2);
   panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
   closeX(px, py, pw);
   text('AYARLAR', cx, py + 36, m * 0.06, '#fff', 900);
@@ -252,7 +261,31 @@ function drawSettings(m) {
     text('Misafirken satın alma yapılamaz. Hesap oluşturursan ilerlemen aktarılır.', cx, y + 10, 11, 'rgba(255,255,255,0.55)', 600);
     text('Misafir hesabını sil', cx, y + 40, 13, 'rgba(255,141,161,0.8)', 700);
     addButton(px + 40, y + 26, pw - 80, 30, () => { overlay = null; showAuth('delete'); });
+    y += 56;
   }
+  text('Gizlilik politikası ve şartlar', cx, y + 8, 13, '#ffd34d', 700);
+  addButton(px + 40, y - 8, pw - 80, 32, () => { window.open('privacy.html', '_blank', 'noopener'); });
+}
+
+// Misafire hatırlatma: ilerlemesini kaybetmesin diye günde en fazla bir kez hesap oluşturmayı önerir
+function maybeRemindGuest() {
+  if (!ACCOUNT || !ACCOUNT.guest || overlay || authRoot.classList.contains('open') || totalStars() < 6) return;
+  const key = 'remind_' + ACCOUNT.id, last = store.get(key, 0);
+  if (Date.now() - last < 24 * 3600 * 1000) return;
+  store.set(key, Date.now());
+  overlay = { type: 'remind' };
+}
+function drawRemind(m) {
+  const pw = Math.min(W - 32, 380), ph = 300, px = cx - pw / 2, py = (H - ph) / 2;
+  panel(px, py, pw, ph); addButton(px, py, pw, ph, () => {});
+  sprite('chest', cx, py + 62, 70);
+  text('İlerlemeni koru', cx, py + 120, m * 0.058, '#ffd34d', 900);
+  text(`★ ${totalStars()} yıldız ve ${P.gold} altının misafir hesabında.`, cx, py + 154, 13, '#fff', 700);
+  text('Telefon değişirse ya da oyun silinirse kaybolabilir.', cx, py + 174, 13, 'rgba(255,255,255,0.75)', 600);
+  text('Hesap oluştur, hepsi aynen aktarılsın.', cx, py + 194, 13, 'rgba(255,255,255,0.75)', 600);
+  const bw = (pw - 42) / 2;
+  textButton('Sonra', px + 16, py + ph - 66, bw, 48, () => closeOverlay(), '#7aa7ff', '#0d1430');
+  textButton('Hesap oluştur', px + 26 + bw, py + ph - 66, bw, 48, () => { overlay = null; showAuth('register'); }, '#58d68d', '#0b2015');
 }
 
 function drawMilestone(m) {
