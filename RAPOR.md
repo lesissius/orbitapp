@@ -95,3 +95,53 @@ Hangi görselin hangi istemle üretildiği `art/KAYNAK.md` dosyasında.
 - `manifest.webmanifest`, `sw.js`, `icon-*.png`, `apple-touch-icon.png`: ana ekrana ekleme ve çevrimdışı oynama
 - `assets/`: oyunda kullanılan kesilmiş görseller (yeniden üretmek için `node tools/build-art.mjs`)
 - `art/`: GPT asılları ve `KAYNAK.md`
+
+---
+
+# Sürüm 2: kısımlar, yıldız eşikleri, jokerler ve market
+
+23 Kasım 2026
+
+## Yeni kurallar
+
+- **Her bölümde 12 iğne var.** 5 iğne saplayınca bölüm geçilir, 8 iğnede ★★, 10 iğnede ★★★ alınır. Boss bölümlerinde 14 iğne ve 6/9/12 eşikleri var.
+- **Hatalı atış bölümü bitirmez, iğneyi harcar.**
+  - Başka iğneye çarpan iğne kırılıp düşer.
+  - Metalden seken iğne kaybolur ve küre ters döner.
+  - Bombaya gelen iğne patlar ve en yakın iğneni de düşürür (−1).
+- **Bölüm sonu:** İğneler bitince ya da süre dolunca saplanan sayı yıldızlara çevrilir. 10 iğneye ulaşınca bölüm hemen biter; artan iğneler altına döner.
+- **Kısımlar:** 1-1…1-10, 2-1…2-10 diye ilerler. Her kısım ayrı bir haritada; bölümler kıvrılarak yükselen bir yolun üstündeki balonlar.
+- **Mihenk taşı:** Her kısmın sonunda bir taş kemer var. Geçmek için o kısımda belirli sayıda yıldız toplamak gerekiyor (1. kısımda 15/30, her kısımda +1, en fazla 22). Yıldız eksikse oyuncu eski bölümleri tekrar oynayabilir. Taşı geçince altın ve her jokerden bir ödül veriliyor; her 3. kısımda ödül daha büyük.
+- **Süreli bölümler:** Her kısmın 4. ve 8. bölümü süreli: 1. kısımda 30 saniye, ilerledikçe azalıp en az 20 saniye.
+- **Bonus bölümler:** Her kısımda 5. bölümden sonra bir bonus var. Tek kısımlarda altın yağmuru (paraları vur), çift kısımlarda hediye kutuları (kutuları vur, rastgele joker kazan). Bonusların yıldızı yok ve bir kez alınıyor.
+- **Jokerler:**
+  - Yavaşlat: küre 8 saniye yavaş döner.
+  - +2 İğne: bölüme 2 iğne ekler.
+  - +15 Saniye: yalnızca süreli bölümlerde kullanılır.
+  - Kullandıkça hakkı azalıyor. Hakkı kalmayan jokere dokununca market açılıyor. Yeni oyuncu 2 adet +2 İğne ile başlıyor.
+- **Altın:**
+  - İlk geçişte 10 + yıldız başına 5 altın, boss'ta +25.
+  - Yıldızı artırınca fark kadar ödül; tekrar oynayınca 2 altın.
+  - Küredeki altın paralar +10 altın.
+- **Market:** Jokerler altınla tek tek ya da üçlü paket olarak alınıyor. Gerçek parayla altın paketleri (500 / 1500 / 4000) görünüyor ama ödeme henüz bağlı değil; dokununca "uygulama mağazaya çıkınca açılacak" yazıyor. Fiyatlar örnek.
+
+## Doğrulama
+
+- Test botu 10 kısmın 110 bölümünü oynadı.
+  - Normal bölümlerin hepsinde 3 yıldız alınabiliyor.
+  - Bonusların hepsi tamamlanabiliyor.
+  - Süreli bölümlerde bot süreyi aşmıyor.
+- Son gereken iğnede güvenli açı 1. kısımda ortalama %61, 8. kısımda %18; en dar bölümde %13.
+- Telefon boyutunda giriş ekranı, harita, bölüm, çarpışma, sonuç penceresi, market satın alma, mihenk taşı ödülü, süreli bölüm, üç joker ve bonus bölüm tek tek denendi.
+
+## Kod düzeni
+
+Oyun tek dosyadan beş dosyaya ayrıldı:
+
+- `js/core.js`: kayıt, ses, görseller, bölüm kataloğu, ilerleme, seviye üretimi
+- `js/play.js`: oynanış, jokerler, sonuç hesabı, test botu
+- `js/render.js`: oyun ekranı ve sonuç/duraklatma pencereleri
+- `js/screens.js`: giriş ekranı, harita, mihenk taşı, market, ayarlar, dokunma girişi
+- `js/main.js`: döngü ve başlangıç
+
+Eski ilerleme yeni yapıya taşınıyor: geçilen seviyeler 1 yıldızla işaretleniyor.

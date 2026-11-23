@@ -28,6 +28,8 @@ const SHEETS = [
   { file: 'parts.png', names: ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound'], size: 384, alpha: true },
   { file: 'fx.png', names: ['fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow'], size: 384, alpha: false },
   { file: 'bosses.png', names: ['boss1', 'boss2', 'boss3'], size: 512, alpha: true, rows: 1 },
+  { file: 'map_items.png', names: ['bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin'], size: 256, alpha: true, rows: 3 },
+  { file: 'skills.png', names: ['sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'], size: 256, alpha: true, rows: 3 },
 ];
 
 // Kenara bağlı açık/beyaz ya da dama tahtası zemini şeffaflaştırır (sahte şeffaflık için yedek).
@@ -143,6 +145,14 @@ if (existsSync(art('icon.png'))) {
   for (const s of [192, 512]) await sharp(art('icon.png')).resize(s, s).png().toFile(join(root, `icon-${s}.png`));
   await sharp(art('icon.png')).resize(180, 180).png().toFile(join(root, 'apple-touch-icon.png'));
   console.log('icon-192, icon-512, apple-touch-icon');
+}
+
+// Harita arka planları (kısım başına; 3 tema döner)
+for (let i = 1; i <= 3; i++) {
+  const src = art(`mapbg/map${i}.png`);
+  if (!existsSync(src)) continue;
+  await sharp(src).resize(768, 1152, { fit: 'cover' }).webp({ quality: 82 }).toFile(out(`map${i}.webp`));
+  console.log('map' + i);
 }
 
 for (let i = 1; i <= 6; i++) {
