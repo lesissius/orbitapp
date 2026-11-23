@@ -1,4 +1,4 @@
-// Orbitap: oynanış (bölüm başlatma, atış, çarpışma, jokerler, süre, sonuç, test botu)
+// Orbitapp: oynanış (bölüm başlatma, atış, çarpışma, jokerler, süre, sonuç, test botu)
 'use strict';
 let screen = 'title';          // 'title' | 'map' | 'play'
 let paused = false;

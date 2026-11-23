@@ -1,4 +1,4 @@
-// Orbitap: üyelik ekranları (hoş geldin, kayıt, giriş, hesap silme). Metin kutuları için HTML kullanılır.
+// Orbitapp: üyelik ekranları (hoş geldin, kayıt, giriş, hesap silme). Metin kutuları için HTML kullanılır.
 'use strict';
 const authRoot = document.createElement('div');
 authRoot.id = 'auth';

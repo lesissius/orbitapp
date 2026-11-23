@@ -1,4 +1,4 @@
-// Orbitap: çekirdek (kayıt, ayarlar, ses, görseller, bölüm kataloğu, ilerleme, seviye üretimi)
+// Orbitapp: çekirdek (kayıt, ayarlar, ses, görseller, bölüm kataloğu, ilerleme, seviye üretimi)
 'use strict';
 const TAU = Math.PI * 2;
 const cv = document.getElementById('c');

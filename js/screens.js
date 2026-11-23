@@ -1,4 +1,4 @@
-// Orbitap: giriş ekranı, harita, mihenk taşı, market, ayarlar, giriş (dokunma) ve döngü
+// Orbitapp: giriş ekranı, harita, mihenk taşı, market, ayarlar, giriş (dokunma) ve döngü
 'use strict';
 let mapScroll = 0, toast = null, resetArmed = false;
 
@@ -39,8 +39,8 @@ function drawTitle() {
   const orb = IMG.orb1;
   for (let k = 0; k < 4; k++) { const wa = rot + k * TAU / 4 + 0.3; drawPin(cx + Math.cos(wa) * R * 0.9, cy + Math.sin(wa) * R * 0.9, wa, L + R * 0.1); }
   if (orb) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.drawImage(orb, -R, -R, R * 2, R * 2); ctx.restore(); }
-  const lw0 = Math.min(W * 0.74, 460); // Orbitap logosu (yüklenemezse yazı)
-  if (!sprite('logo', cx, H * 0.615, lw0 * 350 / 900)) text(BRAND.toLocaleUpperCase(LANG), cx, H * 0.64, m * 0.1, '#fff', 900);
+  const lw0 = Math.min(W * 0.74, 460); // Orbitapp logosu (yüklenemezse yazı)
+  if (!sprite('logo', cx, H * 0.615, IMG.logo ? lw0 * IMG.logo.height / IMG.logo.width : 0)) text(BRAND.toLocaleUpperCase(LANG), cx, H * 0.64, m * 0.1, '#fff', 900);
   ctx.globalAlpha = 0.6 + 0.35 * Math.sin(performance.now() / 300);
   text(t('tap_start'), cx, H * 0.72, m * 0.045, '#fff', 700);
   ctx.globalAlpha = 1;

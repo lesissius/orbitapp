@@ -1,7 +1,7 @@
 // Dil desteği: tr, en. t('anahtar', { değişken }) ile kullanılır.
 // Oyun adı tek yerde: BRAND (yeni ad seçilince yalnızca burası değişir).
 'use strict';
-const BRAND = 'Orbitap';
+const BRAND = 'Orbitapp';
 
 const LANGS = [
   { code: 'tr', name: 'Türkçe' },

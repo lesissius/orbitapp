@@ -1,6 +1,6 @@
 {
-  "name": "Orbitap",
-  "short_name": "Orbitap",
+  "name": "Orbitapp",
+  "short_name": "Orbitapp",
   "description": "Stick the pins into the spinning orb.",
   "lang": "en",
   "start_url": "./",

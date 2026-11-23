@@ -1,4 +1,4 @@
-// Orbitap hesap sunucusu (Cloudflare Worker + D1)
+// Orbitapp hesap sunucusu (Cloudflare Worker + D1)
 // Misafir hesabı, kullanıcı adı + şifre ile kayıt/giriş, ilerleme eşitleme, hesap silme, günlük temizlik.
 // Güvenlik: PBKDF2 şifre özeti, oturum anahtarının yalnızca özeti, IP'nin yalnızca tuzlanmış özeti,
 // istek sınırları, kullanıcı adı filtresi, ilerleme için yapı + sıra + değer + hız kontrolleri.
