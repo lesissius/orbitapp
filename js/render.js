@@ -336,14 +336,22 @@ function drawPauseMenu(m) {
   ctx.fillStyle = 'rgba(6,4,16,0.88)'; ctx.fillRect(0, 0, W, H);
   const pw = Math.min(W - 32, 420), px = cx - pw / 2;
   let y = Math.max(SAFE.top + 50, H * 0.14);
-  text('DURAKLATILDI', cx, y, m * 0.08, '#fff', 900); y += m * 0.1;
-  const bb = m * 0.18;
-  iconButton('ui_play', cx - bb * 1.5 - 16, y, bb, () => setPaused(false), '▶');
-  iconButton('ui_restart', cx - bb / 2, y, bb, () => startLevel(curNode), '↻');
-  iconButton('map', cx + bb / 2 + 16, y, bb, () => goMap(), 'H');
-  text('Devam', cx - bb - 16, y + bb + 16, m * 0.034, 'rgba(255,255,255,0.8)', 700);
-  text('Baştan', cx, y + bb + 16, m * 0.034, 'rgba(255,255,255,0.8)', 700);
-  text('Harita', cx + bb + 16, y + bb + 16, m * 0.034, 'rgba(255,255,255,0.8)', 700);
+  text('DURAKLATILDI', cx, y, m * 0.08, '#fff', 900); y += m * 0.06;
+  text(`${lv.kind === 'bonus' ? lv.c + '-BONUS' : lv.id} · ${stuckCount} iğne saplandı · ${pinsLeft} iğne kaldı`, cx, y, m * 0.032, 'rgba(255,255,255,0.65)', 700); y += m * 0.06;
+  // dört seçenek: devam, baştan, harita, ana sayfa
+  const items = [
+    ['ui_play', 'Devam', () => setPaused(false), '▶'],
+    ['ui_restart', 'Baştan', () => startLevel(curNode), '↻'],
+    ['map', 'Harita', () => goMap(), 'H'],
+    ['ui_home', 'Ana sayfa', () => goHome(), '⌂'],
+  ];
+  const gap = 14, bb = Math.min(m * 0.17, (pw - gap * 3) / 4);
+  const x0 = cx - (bb * 4 + gap * 3) / 2;
+  items.forEach(([icon, label, fn, fb], i) => {
+    const x = x0 + i * (bb + gap);
+    iconButton(icon, x, y, bb, fn, fb);
+    text(label, x + bb / 2, y + bb + 16, m * 0.032, 'rgba(255,255,255,0.85)', 700);
+  });
   y += bb + 60;
   drawToggles(px, y, pw, m);
 }

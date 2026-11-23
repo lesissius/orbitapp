@@ -140,6 +140,20 @@ if (existsSync(art('hand_trophy.png'))) {
   }
 }
 
+// Ana sayfa düğmesi (tek simge, yeşil perde)
+if (existsSync(art('ui_home.png'))) {
+  const { data, info } = await sharp(art('ui_home.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data);
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], m = Math.max(r, b);
+    if (g > 120 && g > m * 1.35) { px[i + 3] = 0; continue; }
+    if (g > m) { const spill = (g - m) / Math.max(1, g); px[i + 1] = m; px[i + 3] = Math.round(px[i + 3] * (1 - Math.min(0.8, spill * 1.5))); }
+  }
+  const buf = await sharp(px, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+  await sharp(await sharp(buf).trim({ threshold: 1 }).png().toBuffer()).resize(160, 160, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile(out('ui_home.png'));
+  console.log('ui_home');
+}
+
 // Uygulama simgeleri (ana ekrana ekleme)
 if (existsSync(art('icon.png'))) {
   for (const s of [192, 512]) await sharp(art('icon.png')).resize(s, s).png().toFile(join(root, `icon-${s}.png`));

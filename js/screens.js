@@ -8,6 +8,12 @@ function goMap() {
   if (curNode) viewChapter = curNode.c;
   lv = null; scrollToCurrent(); musicUpdate();
 }
+// Ana sayfaya (giriş ekranı) dön: bölüm yarıdaysa o deneme bırakılır, kazanılanlar zaten kayıtlı
+function goHome() {
+  screen = 'title'; paused = false; overlay = null; state = 'play'; lv = null;
+  if (curNode) viewChapter = curNode.c;
+  musicUpdate();
+}
 function setPaused(p) {
   if (screen !== 'play' || p === paused) return;
   if (p && state !== 'play' && state !== 'bossintro') return;
@@ -136,6 +142,7 @@ function drawMap() {
   hg.addColorStop(0, 'rgba(10,8,30,0.92)'); hg.addColorStop(0.8, 'rgba(10,8,30,0.7)'); hg.addColorStop(1, 'rgba(10,8,30,0)');
   ctx.fillStyle = hg; ctx.fillRect(0, 0, W, mapHeaderH() + 20);
   iconButton('ui_settings', left, top, 40, () => { overlay = { type: 'settings' }; resetArmed = false; }, '⚙');
+  iconButton('ui_home', left + 50, top, 40, () => goHome(), '⌂');
   // kayıt durumu: yeşil kayıtlı, sarı kaydediliyor, gri çevrimdışı, kırmızı hata
   if (ACCOUNT) {
     const col = ACCOUNT.offline || syncState === 'offline' ? '#9aa0b4' : syncState === 'error' ? '#ff6b81' : syncState === 'saving' ? '#ffd34d' : '#58d68d';
