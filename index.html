@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#14112b">
+<title>İğne Ustası</title>
+<meta name="description" content="Dönen küreye iğneleri sapla, birbirine değdirme.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="İğne Ustası">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#14112b;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  canvas{display:block;width:100vw;height:100vh;height:100dvh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="safe" style="position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)"></div>
+<script>
+(() => {
+'use strict';
+const TAU = Math.PI * 2;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+let cx, cy, R, L, HEAD, LAUNCH_Y, GAP;
+let SAFE = { top: 0, bottom: 0, left: 0, right: 0 };
+
+// ---------- persistence ----------
+let SIM = false; // test botu çalışırken ses, titreşim ve kayıt kapalı
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('igne_' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { if (SIM) return; try { localStorage.setItem('igne_' + k, JSON.stringify(v)); } catch {} }
+};
+let level = store.get('level', 1);
+let best = store.get('best', 1);
+// Ayarlar: ses, müzik, titreşim ve ekran sarsıntısı ayrı ayrı açılıp kapanır
+const settings = Object.assign({ sound: !store.get('muted', false), music: true, vibe: true, shake: true }, store.get('settings', {}));
+let muted = !settings.sound;
+const saveSettings = () => { muted = !settings.sound; store.set('settings', settings); musicUpdate(); };
+let lives = store.get('lives', 0);
+const starsByLevel = store.get('stars', {}); // seviye → en iyi yıldız (1–3)
+const totalStars = () => Object.values(starsByLevel).reduce((s, v) => s + v, 0);
+const MAX_LIVES = 3;
+const seen = store.get('seen', {});
+let banner = null; // { title, text, t }
+let bossIntroSeen = 0;
+
+// ---------- audio ----------
+let actx = null;
+function audio() {
+  if (muted || SIM) return null;
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'sine', vol = 0.15, slideTo = null, delay = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol = 0.3, freq = 800) {
+  const a = audio(); if (!a) return;
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * dur), a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const s = a.createBufferSource(); s.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq;
+  const g = a.createGain(); g.gain.value = vol;
+  s.connect(f).connect(g).connect(a.destination); s.start();
+}
+const vibrate = (p) => { if (settings.vibe && !SIM && navigator.vibrate) { try { navigator.vibrate(p); } catch {} } };
+
+// ---------- müzik: sakin, temaya göre değişen akor ve arpej (WebAudio ile üretilir) ----------
+const PROGS = [
+  [[220, 277, 330], [196, 247, 294], [175, 220, 262], [196, 247, 330]],   // A, G, F, G
+  [[262, 330, 392], [220, 262, 330], [175, 220, 262], [196, 247, 294]],   // C, Am, F, G
+  [[233, 294, 349], [208, 262, 311], [196, 233, 294], [175, 220, 262]],
+  [[247, 311, 370], [220, 277, 330], [185, 233, 277], [208, 262, 311]],
+  [[196, 247, 294], [165, 196, 247], [131, 165, 196], [147, 185, 220]],
+  [[220, 262, 330], [175, 220, 262], [196, 247, 294], [165, 208, 247]],
+];
+const BOSS_PROG = [[110, 131, 165], [104, 131, 156], [98, 117, 147], [104, 123, 156]];
+let musicGain = null, musicTimer = null, musicBar = 0, musicNext = 0;
+function musicUpdate() {
+  const want = settings.music && settings.sound && started && !paused && !document.hidden && !SIM;
+  if (want && !musicTimer) {
+    const a = audio(); if (!a) return;
+    if (!musicGain) { musicGain = a.createGain(); musicGain.gain.value = 0; musicGain.connect(a.destination); }
+    musicGain.gain.setTargetAtTime(0.5, a.currentTime, 0.5);
+    musicNext = a.currentTime + 0.1;
+    musicTimer = setInterval(musicTick, 200);
+    musicTick();
+  } else if (!want && musicTimer) {
+    clearInterval(musicTimer); musicTimer = null;
+    if (musicGain && actx) musicGain.gain.setTargetAtTime(0, actx.currentTime, 0.15);
+  }
+}
+function musicNote(f, t0, dur, type, vol, attack) {
+  const o = actx.createOscillator(), g = actx.createGain(), fl = actx.createBiquadFilter();
+  o.type = type; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.value = 1400;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(fl).connect(g).connect(musicGain); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function musicTick() {
+  if (!actx || !musicGain) return;
+  const boss = lv && lv.boss;
+  const bar = boss ? 1.6 : 2.4;
+  while (musicNext < actx.currentTime + 0.6) {
+    const prog = boss ? BOSS_PROG : PROGS[themeIndex()];
+    const chord = prog[musicBar % prog.length];
+    for (const f of chord) musicNote(f, musicNext, bar * 1.05, 'triangle', 0.025, bar * 0.35);
+    musicNote(chord[0] / 2, musicNext, bar, 'sine', 0.05, 0.05);
+    const steps = boss ? 8 : 6;
+    for (let i = 0; i < steps; i++) {
+      const f = chord[(i * 2 + musicBar) % 3] * (i % 2 ? 2 : 4) / (boss ? 2 : 1);
+      musicNote(f, musicNext + i * bar / steps, 0.35, boss ? 'square' : 'sine', boss ? 0.008 : 0.014, 0.01);
+    }
+    musicNext += bar; musicBar++;
+  }
+}
+const sfx = {
+  throw() { tone(900, 0.06, 'triangle', 0.05, 1500); },
+  stick(i) { tone(320 + i * 22, 0.09, 'square', 0.06, 180); vibrate(8); },
+  shield() { tone(1400, 0.25, 'triangle', 0.1, 700); tone(2100, 0.2, 'sine', 0.05, 1200); vibrate([10, 30, 10]); },
+  fail() { tone(220, 0.4, 'sawtooth', 0.12, 70); vibrate(120); },
+  boom() { noise(0.6, 0.5, 600); tone(90, 0.5, 'sine', 0.3, 30); vibrate([60, 40, 140]); },
+  win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.1, null, i * 0.08)); vibrate([15, 40, 15]); }
+};
+
+// ---------- themes ----------
+const THEMES = [
+  { bg: ['#1b1640', '#0d0b20'], orb: ['#ffb84d', '#ff6b3d'], pin: '#f4f1ff', accent: '#ffb84d' },
+  { bg: ['#0f2a3a', '#06131c'], orb: ['#5ef0c8', '#1fa3b8'], pin: '#eafffa', accent: '#5ef0c8' },
+  { bg: ['#3a1030', '#170616'], orb: ['#ff7ac6', '#b23ad1'], pin: '#fff0fa', accent: '#ff7ac6' },
+  { bg: ['#1f2a10', '#0b1205'], orb: ['#c8f25e', '#5fae2b'], pin: '#f7ffe8', accent: '#c8f25e' },
+  { bg: ['#10183a', '#05081c'], orb: ['#8ab4ff', '#4a5bff'], pin: '#eef3ff', accent: '#8ab4ff' },
+  { bg: ['#2a1012', '#100506'], orb: ['#ff6b6b', '#b8202e'], pin: '#fff0f0', accent: '#ff7b7b' },
+];
+const themeIndex = () => Math.floor(((lv ? lv.n : level) - 1) / 10) % THEMES.length;
+const theme = () => THEMES[themeIndex()];
+
+// ---------- sprites (GPT çizimleri; yüklenemezse vektör çizime düşer) ----------
+const IMG = {};
+const SPRITES = ['pin', 'pin_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
+  'orb1', 'orb2', 'orb3', 'orb4', 'orb5', 'orb6', 'boss1', 'boss2', 'boss3',
+  'ui_pause', 'ui_play', 'ui_restart', 'ui_music', 'ui_vibe', 'ui_shake', 'ui_hand', 'ui_trophy'];
+for (const n of SPRITES) { const im = new Image(); im.onload = () => { IMG[n] = im; }; im.src = `assets/${n}.png`; }
+for (let i = 1; i <= 6; i++) { const im = new Image(); im.onload = () => { IMG['bg' + i] = im; }; im.src = `assets/bg${i}.webp`; }
+
+// ---------- rng ----------
+function mulberry32(a) {
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const norm = (a) => ((a % TAU) + TAU) % TAU;
+const angDiff = (a, b) => { const d = Math.abs(norm(a) - norm(b)); return Math.min(d, TAU - d); };
+const inArc = (a, z) => norm(a - z.start) <= z.width;
+
+// ---------- level generation ----------
+const BOSSES = [
+  { name: 'LAV GOLEMİ', aura: '#ff6a1a' },
+  { name: 'DEMİR GÖZ', aura: '#ff2a3a' },
+  { name: 'KRİSTAL GÖLGE', aura: '#9b5cff' },
+];
+
+function makeLevel(n) {
+  const rnd = mulberry32(n * 9973 + 17);
+  const lv = { n };
+  lv.speed = Math.min(1.05 + n * 0.035, 2.8);
+  lv.dir = rnd() < 0.5 ? 1 : -1;
+  const pats = n < 4 ? ['steady'] : n < 9 ? ['steady', 'reverse', 'wave'] : ['steady', 'reverse', 'wave', 'pulse', 'reverse', 'wave'];
+  lv.pattern = pats[Math.floor(rnd() * pats.length)];
+  lv.period = 1.6 + rnd() * 2.2;
+
+  // zones (local angles on the orb)
+  lv.zones = [];
+  // Bölge sayısı yavaş artar (eskiden 17. seviyede 5 bölgeye çıkıp küreyi dolduruyordu)
+  const bombs = n >= 5 ? Math.min(1 + Math.floor((n - 5) / 15), 3) : 0;
+  const shields = n >= 8 ? Math.min(1 + Math.floor((n - 8) / 20), 2) : 0;
+  const want = [];
+  for (let i = 0; i < bombs; i++) want.push({ type: 'bomb', width: 0.38 + rnd() * 0.14 });
+  for (let i = 0; i < shields; i++) want.push({ type: 'shield', width: 0.42 + rnd() * 0.16 });
+  for (const z of want) {
+    for (let t = 0; t < 60; t++) {
+      const start = rnd() * TAU;
+      const mid = start + z.width / 2;
+      const ok = lv.zones.every(o => angDiff(mid, o.start + o.width / 2) > (z.width + o.width) / 2 + 0.35);
+      if (ok) { lv.zones.push({ ...z, start }); break; }
+    }
+  }
+
+  // capacity check
+  const free = TAU - lv.zones.reduce((s, z) => s + z.width + GAP, 0);
+  // Yoğunluk: iğne başına ayrılan boşluk seviyeyle yavaşça daralır (son iğnede insanın yakalayabileceği pencere kalsın)
+  const density = Math.max(2.35, 3.4 - n * 0.02);
+  const cap = Math.floor(free / (GAP * density));
+  let pre = n === 1 ? 0 : Math.min(Math.floor((n + 1) / 4), 6);
+  let throwN = Math.min(6 + Math.floor(n * 0.45), 20);
+  while (pre + throwN > cap) { if (pre > 0 && pre >= throwN / 3) pre--; else throwN--; }
+  lv.throwN = Math.max(throwN, 4);
+
+  // preplaced pins
+  lv.pre = [];
+  for (let i = 0; i < pre; i++) {
+    for (let t = 0; t < 80; t++) {
+      const a = rnd() * TAU;
+      const okZ = lv.zones.every(z => !inArc(a, { start: z.start - GAP, width: z.width + GAP * 2 }));
+      const okP = lv.pre.every(b => angDiff(a, b) > GAP * 2.2);
+      if (okZ && okP) { lv.pre.push(a); break; }
+    }
+  }
+
+  // Gezen zırh (22+): metal plakalar kürenin üstünde kendi başına kayar
+  for (const z of lv.zones) if (z.type === 'shield' && n >= 22) z.vel = (0.25 + rnd() * 0.35) * (rnd() < 0.5 ? -1 : 1);
+
+  // Altın hedef (12+): vurursan +1 can
+  lv.gold = null;
+  if (n >= 12 && rnd() < 0.75) {
+    for (let t = 0; t < 80; t++) {
+      const a = rnd() * TAU;
+      const okZ = lv.zones.every(z => !inArc(a, { start: z.start - GAP * 1.5, width: z.width + GAP * 3 }));
+      const okP = lv.pre.every(b => angDiff(a, b) > GAP * 2);
+      if (okZ && okP) { lv.gold = { a, taken: false }; break; }
+    }
+  }
+
+  // Boss (her 10. seviye): kendi küresi, düzensiz dönüş, can barı, yarı canda öfke
+  if (n % 10 === 0) {
+    const idx = (n / 10 - 1) % BOSSES.length;
+    lv.boss = { idx, hits: 0, rage: false, seg: 0.8 + rnd() * 0.5,
+      // geri dönüşler kısa ve yavaş: küre net olarak ilerler, her açı aşağı gelir
+      seq: Array.from({ length: 64 }, () => (rnd() < 0.28 ? -(0.3 + rnd() * 0.5) : 0.5 + rnd() * 1.3)) };
+    lv.pattern = 'boss';
+    lv.gold = null;
+    lv.throwN += Math.min(4, Math.max(0, cap - lv.pre.length - lv.throwN - 1));
+  }
+  return lv;
+}
+
+// ---------- state ----------
+let lv, rot, t, stuck, flying, bounced, remaining, state, stateT, particles, fx = [], shake, dirMul, orbPulse, flash, failInfo, started;
+let paused = false;
+let runStats = { lifeUsed: 0, bounces: 0 }; // yıldız hesabı için bölüm içi sayaçlar
+let lastStars = 0;
+
+function layout() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // çentik / ev çubuğu payı (iPhone vb.)
+  const cs = getComputedStyle(document.getElementById('safe'));
+  SAFE = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0, left: parseFloat(cs.paddingLeft) || 0, right: parseFloat(cs.paddingRight) || 0 };
+  const s = Math.min(W, H * 0.62);
+  cx = W / 2; cy = H * 0.36 + SAFE.top * 0.5;
+  R = s * (W < 500 ? 0.18 : 0.17); L = R * 1.25; HEAD = Math.max(5, R * 0.13);
+  LAUNCH_Y = Math.min(H * 0.8, H - SAFE.bottom - L - 30);
+  // Açısal boşluk ekran boyutundan bağımsız: seviyeler her cihazda aynı üretilir
+  GAP = 2 * Math.asin(0.13 / 2.25) + 0.012;
+}
+
+function startLevel() {
+  lv = makeLevel(level);
+  rot = 0; t = 0; dirMul = 1;
+  stuck = lv.pre.map(a => ({ a, pre: true, hit: 0 }));
+  flying = []; bounced = []; particles = []; fx = [];
+  remaining = lv.throwN;
+  state = 'play'; stateT = 0; shake = 0; orbPulse = 0; flash = 0; failInfo = null;
+  runStats = { lifeUsed: 0, bounces: 0 };
+  // yeni mekanik ilk kez çıkınca kısa tanıtım
+  const intro = [
+    [lv.zones.some(z => z.type === 'bomb'), 'bomb', 'BOMBA', 'Kırmızı çıkıntıya iğne gelirse patlar'],
+    [lv.zones.some(z => z.type === 'shield'), 'shield', 'ZIRH', 'Metalden iğne seker, küre ters döner'],
+    [!!lv.gold, 'gold', 'ALTIN HEDEF', 'Yıldızı vur: +1 can kazan'],
+    [lv.zones.some(z => z.vel), 'drift', 'GEZEN ZIRH', 'Metal plakalar artık kendi başına kayıyor'],
+  ].find(([on, key]) => on && !seen[key]);
+  banner = null;
+  if (intro) { seen[intro[1]] = true; store.set('seen', seen); banner = { title: 'YENİ: ' + intro[2], text: intro[3], t: 0 }; }
+  if (lv.boss) {
+    state = 'bossintro';
+    lv.introDur = bossIntroSeen === lv.n ? 0.7 : 1.8; // tekrar denemede kısa
+    bossIntroSeen = lv.n;
+    if (started) bossSting();
+  }
+}
+
+function bossSting() {
+  [110, 98, 82].forEach((f, i) => tone(f, 0.45, 'sawtooth', 0.12, f * 0.9, i * 0.22));
+  noise(0.5, 0.25, 300); vibrate([40, 60, 40, 60, 120]);
+  shake = 10;
+}
+
+// Boss yarı canına inince öfkelenir: hızlanır ve boş bir yere bomba çıkarır
+function bossRage() {
+  const b = lv.boss; b.rage = true;
+  shake = 16; flash = 0.5; orbPulse = 1;
+  noise(0.4, 0.3, 500); tone(70, 0.6, 'sawtooth', 0.15, 45); vibrate([30, 40, 80]);
+  addFx('fx_ring', cx, cy, R, R * 4.5, 0.6);
+  const w = 0.42;
+  let placed = false;
+  for (let k = 0; k < 120 && !placed; k++) {
+    const start = Math.random() * TAU;
+    const box = { start: start - GAP, width: w + GAP * 2 };
+    const okP = stuck.every(s => !inArc(s.a, box));
+    const okZ = lv.zones.every(o => angDiff(start + w / 2, o.start + o.width / 2) > (w + o.width) / 2 + 0.2);
+    const okB = !inArc(norm(Math.PI / 2 - rot), { start: start - 0.6, width: w + 1.2 }); // tam altta belirmesin
+    if (okP && okZ && okB) { lv.zones.push({ type: 'bomb', width: w, start, born: 1 }); placed = true; }
+  }
+  banner = { title: 'ÖFKELENDİ!', text: placed ? 'Boss hızlandı ve bomba çıkardı' : 'Boss hızlandı', t: 0 };
+}
+
+// Can varsa hatayı affet: iğne kırılır, oyun sürer
+function useLife(reason, x, y, zone) {
+  if (lives <= 0) return false;
+  lives--; store.set('lives', lives); runStats.lifeUsed++;
+  shake = 10; flash = 0.6;
+  if (reason === 'bomb') {
+    sfx.boom();
+    addFx('fx_boom', x, y, R * 0.4, R * 2.2, 0.6, Math.random() * TAU, 0.6);
+    addFx('fx_ring', x, y, R * 0.3, R * 3, 0.5);
+    lv.zones = lv.zones.filter(z => z !== zone); // bomba harcanır
+  } else {
+    sfx.fail();
+    addFx('fx_spark', x, y, R * 0.3, R * 1.4, 0.3);
+  }
+  bounced.push({ x, y: y + L / 2, vx: (Math.random() - 0.5) * 400, vy: 500, r: Math.PI, vr: 12, life: 0.9 });
+  banner = { title: '♥ CAN HARCANDI', text: lives ? `${lives} can kaldı` : 'Can kalmadı', t: 0 };
+  return true;
+}
+
+function angularVelocity() {
+  const base = lv.speed * lv.dir * dirMul;
+  switch (lv.pattern) {
+    // ileri tam süre, geri yarım süre: eskiden gidip gelme yayı 360°'den kısa kalınca kürenin bir kısmı hiç aşağı gelmiyordu
+    case 'reverse': { const c = t % (lv.period * 1.5); return base * (c < lv.period ? 1 : -1); }
+    case 'wave': return base * (0.35 + 0.9 * (0.5 + 0.5 * Math.sin(t * TAU / (lv.period * 1.6))));
+    case 'pulse': { const p = (t % lv.period) / lv.period; const w = base * (p < 0.7 ? 0.45 : 2.4); return Math.max(-4.6, Math.min(4.6, w)); }
+    case 'boss': {
+      const b = lv.boss, x = t / b.seg, i = Math.floor(x), f = x - i;
+      const s = f * f * (3 - 2 * f);
+      const m = b.seq[i % 64] * (1 - s) + b.seq[(i + 1) % 64] * s;
+      return base * m * (b.rage ? 1.35 : 1);
+    }
+    default: return base;
+  }
+}
+
+// ---------- input ----------
+const RETRY_DELAY = 0.8; // yenilgiden sonra hızlı dokunuşla ekranı görmeden yeniden başlamayı önler
+function throwPin() {
+  audio();
+  if (paused) return;
+  if (!started) { started = true; musicUpdate(); if (lv.boss) { state = 'bossintro'; stateT = 0; bossSting(); } return; }
+  if (state === 'fail') { if (stateT > RETRY_DELAY) startLevel(); return; }
+  if (state === 'win') return;
+  if (state !== 'play' || remaining <= 0) return;
+  remaining--;
+  flying.push({ y: LAUNCH_Y, v: Math.max(H * 3.2, 1800) }); // y = iğnenin ucu
+  sfx.throw();
+  tutorialDone = true;
+}
+let tutorialDone = store.get('best', 1) > 1;
+
+// Ekrandaki düğmeler her karede yeniden kaydedilir; dokunuş önce bunlara bakar
+let uiButtons = [];
+const addButton = (x, y, w, h, action) => uiButtons.push({ x, y, w, h, action });
+let menuLevel = 1, resetArmed = false;
+
+function setPaused(p) {
+  if (p === paused) return;
+  if (p && (!started || state === 'win')) return;
+  paused = p;
+  if (p) { menuLevel = lv.n; resetArmed = false; }
+  musicUpdate();
+}
+function goToLevel(n) {
+  level = Math.max(1, Math.min(best, n)); store.set('level', level);
+  paused = false; startLevel(); musicUpdate();
+}
+
+cv.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const mx = e.clientX, my = e.clientY;
+  for (let i = uiButtons.length - 1; i >= 0; i--) {
+    const b = uiButtons[i];
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) { audio(); b.action(); return; }
+  }
+  if (paused) return; // menü açıkken boş yere dokunmak atış yapmaz
+  throwPin();
+});
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); if (!e.repeat) { if (paused) setPaused(false); else throwPin(); } }
+  if (e.code === 'Escape' || e.code === 'KeyP') setPaused(!paused);
+  if (e.code === 'KeyM') { settings.sound = !settings.sound; saveSettings(); }
+});
+window.addEventListener('resize', layout);
+// Uygulama arka plana geçince (arama, sekme değişimi) oyun kendiliğinden durur
+document.addEventListener('visibilitychange', () => { if (document.hidden && started && state === 'play') setPaused(true); musicUpdate(); });
+window.addEventListener('blur', () => { if (started && state === 'play' && !SIM) setPaused(true); });
+
+// ---------- fx ----------
+function burst(x, y, color, count, speed, life = 0.7, size = 3) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * TAU, s = speed * (0.3 + Math.random());
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color, size: size * (0.5 + Math.random()) });
+  }
+}
+
+// sprite efekti: büyüyerek söner, "lighter" karışımıyla parlar
+function addFx(name, x, y, size0, size1, life, rot = 0, vr = 0) {
+  fx.push({ name, x, y, s0: size0, s1: size1, life, max: life, rot, vr });
+}
+
+function fail(reason, x, y) {
+  state = 'fail'; stateT = 0; failInfo = { reason, x, y };
+  shake = reason === 'bomb' ? 24 : 12;
+  flash = 1;
+  if (reason === 'bomb') {
+    sfx.boom();
+    addFx('fx_boom', x, y, R * 0.6, R * 3.4, 0.75, Math.random() * TAU, 0.6);
+    addFx('fx_ring', x, y, R * 0.4, R * 4.5, 0.6);
+    addFx('fx_glow', x, y, R * 2, R * 5, 0.5);
+    burst(x, y, '#ff5a3d', 40, 520, 0.9, 5); burst(x, y, '#ffd34d', 24, 380, 0.7, 4);
+  } else {
+    sfx.fail();
+    addFx('fx_spark', x, y, R * 0.3, R * 1.6, 0.35, Math.random());
+    burst(x, y, '#ff4d6d', 16, 200);
+  }
+}
+
+function win() {
+  state = 'win'; stateT = 0; sfx.win(); orbPulse = 1;
+  const th = theme();
+  addFx('fx_gold', cx, cy, R * 1.5, R * 5.5, 1.1, 0, 0.8);
+  addFx('fx_ring', cx, cy, R, R * 6, 0.8);
+  burst(cx, cy, th.accent, 50, 600, 1.1, 4);
+  burst(cx, cy, '#ffffff', 24, 420, 0.9, 3);
+  if (lv.boss) {
+    // boss parçalanır: art arda patlamalar, ödül olarak +1 can
+    sfx.boom();
+    for (let k = 0; k < 6 && !SIM; k++) {
+      const a = Math.random() * TAU, d = R * (0.2 + Math.random() * 0.9);
+      setTimeout(() => {
+        addFx('fx_boom', cx + Math.cos(a) * d, cy + Math.sin(a) * d, R * 0.4, R * 2.2, 0.6, Math.random() * TAU, 0.8);
+        noise(0.3, 0.25, 700); shake = 14;
+      }, k * 110);
+    }
+    burst(cx, cy, BOSSES[lv.boss.idx].aura, 60, 700, 1.2, 5);
+    for (const s of stuck) { // saplı iğneler savrulur
+      const wa = s.a + rot;
+      bounced.push({ x: cx + Math.cos(wa) * (R + L / 2), y: cy + Math.sin(wa) * (R + L / 2), vx: Math.cos(wa) * 500, vy: Math.sin(wa) * 500 - 300, r: wa - Math.PI / 2, vr: (Math.random() - 0.5) * 20, life: 1.4 });
+    }
+    lv.boss.reward = lives < MAX_LIVES;
+    if (lv.boss.reward) { lives++; store.set('lives', lives); }
+  }
+  // yıldız: bitirmek ★, can harcamamak ★, metale çarpmamak ★
+  lastStars = 1 + (runStats.lifeUsed === 0 ? 1 : 0) + (runStats.bounces === 0 ? 1 : 0);
+  if (!SIM && lastStars > (starsByLevel[lv.n] || 0)) { starsByLevel[lv.n] = lastStars; store.set('stars', starsByLevel); }
+  level++; if (level > best) best = level;
+  store.set('level', level); store.set('best', best);
+}
+
+// ---------- update ----------
+function update(dt) {
+  stateT += dt;
+  if (!started) { rot += 0.6 * dt; return; }
+  if (state === 'play' || state === 'win') {
+    t += dt;
+    const w = state === 'win' ? angularVelocity() * (1 + stateT * 6) : angularVelocity();
+    rot = norm(rot + w * dt);
+    // gezen zırh: iğneye ya da başka bölgeye değince geri döner
+    for (const z of lv.zones) {
+      if (!z.vel || state !== 'play') continue;
+      const ns = norm(z.start + z.vel * dt);
+      const box = { start: ns - GAP * 0.6, width: z.width + GAP * 1.2 };
+      const blocked = stuck.some(s => inArc(s.a, box)) || (lv.gold && !lv.gold.taken && inArc(lv.gold.a, box)) ||
+        lv.zones.some(o => o !== z && angDiff(ns + z.width / 2, o.start + o.width / 2) < (z.width + o.width) / 2 + 0.08);
+      if (blocked) z.vel = -z.vel; else z.start = ns;
+    }
+  }
+  if (state === 'bossintro') { rot = norm(rot + 0.8 * dt); if (stateT > lv.introDur) { state = 'play'; stateT = 0; } }
+  if (lv.boss && lv.boss.flash) lv.boss.flash = Math.max(0, lv.boss.flash - dt * 4);
+  for (const z of lv.zones) if (z.born) z.born = Math.max(0, z.born - dt * 3);
+  if (banner) banner.t += dt;
+  if (state === 'win' && stateT > (lv.boss ? 2.2 : 1.25)) startLevel();
+
+  // flying pins
+  const PROT = R * 0.3; // çıkıntı yüksekliği
+  for (let i = flying.length - 1; i >= 0; i--) {
+    const p = flying[i];
+    p.y -= p.v * dt;
+    if (state !== 'play') continue;
+    const a = norm(Math.PI / 2 - rot); // kürenin altındaki yerel açı
+    const zone = lv.zones.find(z => inArc(a, z));
+    const surface = cy + R + (zone ? PROT : 0);
+    if (p.y <= surface) {
+      flying.splice(i, 1);
+      const tipX = cx, tipY = surface;
+      if (zone && zone.type === 'bomb') { if (!useLife('bomb', tipX, tipY, zone)) fail('bomb', tipX, tipY); else if (remaining === 0 && flying.length === 0) win(); continue; }
+      if (zone && zone.type === 'shield') {
+        sfx.shield(); dirMul *= -1; remaining++; runStats.bounces++;
+        bounced.push({ x: cx, y: tipY + L / 2, vx: (Math.random() - 0.5) * 300, vy: 600, r: Math.PI, vr: (Math.random() < 0.5 ? -1 : 1) * 14, life: 0.9 });
+        addFx('fx_metal', tipX, tipY + R * 0.2, R * 0.5, R * 1.5, 0.4, Math.PI);
+        addFx('fx_spark', tipX, tipY, R * 0.3, R * 1.1, 0.25);
+        burst(tipX, tipY, '#d9e2f2', 10, 260, 0.4, 2);
+        continue;
+      }
+      const clash = stuck.find(s => angDiff(s.a, a) < GAP);
+      if (clash) {
+        if (useLife('clash', cx, cy + R + L * 0.5)) { if (remaining === 0 && flying.length === 0) win(); continue; }
+        clash.hit = 1; stuck.push({ a, hit: 1 }); fail('clash', cx, cy + R + L); continue;
+      }
+      stuck.push({ a, hit: 0, born: 1 });
+      if (lv.boss) {
+        lv.boss.hits++; lv.boss.flash = 1;
+        if (!lv.boss.rage && lv.boss.hits >= Math.ceil(lv.throwN / 2) && remaining > 0) bossRage();
+      }
+      if (lv.gold && !lv.gold.taken && angDiff(a, lv.gold.a) < GAP * 1.3) {
+        lv.gold.taken = true;
+        const gained = lives < MAX_LIVES; if (gained) { lives++; store.set('lives', lives); }
+        addFx('fx_gold', tipX, tipY, R * 0.5, R * 2.6, 0.7, 0, 1);
+        [880, 1175, 1568].forEach((f, k) => tone(f, 0.14, 'triangle', 0.09, null, k * 0.06));
+        burst(tipX, tipY, '#ffd34d', 24, 320, 0.7, 3);
+        banner = { title: gained ? '♥ +1 CAN' : 'CANLAR DOLU', text: `${lives}/${MAX_LIVES}`, t: 0 };
+      }
+      orbPulse = 0.5;
+      sfx.stick(lv.throwN - remaining);
+      addFx('fx_spark', tipX, tipY, R * 0.25, R * 0.9, 0.22, Math.random());
+      burst(tipX, tipY, theme().pin, 6, 140, 0.3, 2);
+      if (remaining === 0 && flying.length === 0) win();
+    }
+  }
+  for (let i = bounced.length - 1; i >= 0; i--) {
+    const b = bounced[i];
+    b.vy += 2200 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt; b.life -= dt;
+    if (b.life <= 0) bounced.splice(i, 1);
+  }
+  for (const s of stuck) { if (s.born) s.born = Math.max(0, s.born - dt * 6); }
+  for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.life -= dt; f.rot += f.vr * dt; if (f.life <= 0) fx.splice(i, 1); }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; p.vy += 300 * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  shake = Math.max(0, shake - dt * 60);
+  orbPulse = Math.max(0, orbPulse - dt * 3);
+  flash = Math.max(0, flash - dt * 2.5);
+}
+
+// ---------- draw ----------
+const FONT = 'system-ui,-apple-system,Segoe UI,sans-serif';
+
+// Vektör yedek iğne: (x1,y1) uç, (x2,y2) baş
+function drawPinVec(x1, y1, x2, y2, color, glow) {
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, HEAD * 0.32); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.fillStyle = color;
+  if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 14; }
+  ctx.beginPath(); ctx.arc(x2, y2, HEAD, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+// İğne: uç (tx,ty), baş yönü açısı (dir), toplam uzunluk len
+function drawPin(tx, ty, dir, len, kind = 'pin', hit = false) {
+  const hx = tx + Math.cos(dir) * len, hy = ty + Math.sin(dir) * len;
+  const im = IMG[kind] || IMG.pin;
+  if (!im) { drawPinVec(tx, ty, hx, hy, hit ? '#ff4d6d' : kind === 'pin_old' ? 'rgba(255,255,255,0.55)' : theme().pin, hit); return; }
+  const h = len + HEAD, w = h * (im.width / im.height) * 0.85;
+  ctx.save();
+  ctx.translate(tx, ty); ctx.rotate(dir + Math.PI / 2);
+  ctx.drawImage(im, -w / 2, -h, w, h);
+  ctx.restore();
+  if (hit) glowAt(hx, hy, HEAD * 5, 'rgba(255,60,80,0.9)');
+}
+
+function glowAt(x, y, size, color) {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  if (IMG.fx_glow && !color) { ctx.drawImage(IMG.fx_glow, x - size / 2, y - size / 2, size, size); }
+  else {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, size / 2);
+    g.addColorStop(0, color || 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, size / 2, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBackground(th) {
+  const bg = IMG['bg' + (themeIndex() + 1)];
+  if (bg) {
+    const s = Math.max(W / bg.width, H / bg.height);
+    const bw = bg.width * s, bh = bg.height * s;
+    ctx.drawImage(bg, (W - bw) / 2, (H - bh) / 2 - (bh - H) * 0.15, bw, bh);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 0, W, H);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, th.bg[0]); g.addColorStop(1, th.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// Çıkıntı: kürenin yüzeyinden dışarı taşan kabarık bant + üstüne dizilen modüller
+function drawZone(z, pr) {
+  const PROT = R * 0.3;
+  const s0 = z.start + rot, s1 = s0 + z.width;
+  const bomb = z.type === 'bomb';
+  // taban bant
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, pr - R * 0.04, s0, s1);
+  ctx.arc(cx, cy, pr + PROT * 0.55, s1, s0, true);
+  ctx.closePath();
+  const g = ctx.createRadialGradient(cx, cy, pr - R * 0.05, cx, cy, pr + PROT * 0.6);
+  if (bomb) { g.addColorStop(0, '#4a0d0d'); g.addColorStop(1, '#a3241c'); }
+  else { g.addColorStop(0, '#3c4352'); g.addColorStop(1, '#aab4c6'); }
+  ctx.fillStyle = g; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8;
+  ctx.fill(); ctx.restore();
+
+  const im = IMG[z.type];
+  const arcLen = z.width * (pr + PROT * 0.3);
+  if (im) {
+    const aspect = im.height / im.width;
+    const k = Math.max(1, Math.round(arcLen / (PROT / aspect * 1.0)));
+    const segW = (arcLen / k) * 1.12, segH = Math.min(segW * aspect, PROT * 1.25);
+    for (let i = 0; i < k; i++) {
+      const a = s0 + z.width * (i + 0.5) / k;
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * (pr - R * 0.03), cy + Math.sin(a) * (pr - R * 0.03));
+      ctx.rotate(a + Math.PI / 2);
+      ctx.drawImage(im, -segW / 2, -segH, segW, segH);
+      ctx.restore();
+    }
+  } else {
+    // vektör yedek: diken / perçin
+    const k = Math.max(2, Math.round(z.width / 0.1));
+    for (let i = 0; i <= k; i++) {
+      const a = s0 + (z.width * i) / k;
+      const nx = -Math.sin(a) * R * 0.05, ny = Math.cos(a) * R * 0.05;
+      const bx = cx + Math.cos(a) * (pr + PROT * 0.4), by = cy + Math.sin(a) * (pr + PROT * 0.4);
+      const tx = cx + Math.cos(a) * (pr + PROT), ty = cy + Math.sin(a) * (pr + PROT);
+      ctx.fillStyle = bomb ? '#ff5a3d' : '#e6ecf5';
+      if (bomb) { ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.lineTo(tx, ty); ctx.lineTo(bx - nx, by - ny); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(bx, by, R * 0.04, 0, TAU); ctx.fill(); }
+    }
+  }
+  if (bomb) {
+    const blink = 0.35 + 0.35 * Math.sin(performance.now() / 140);
+    const mid = s0 + z.width / 2;
+    glowAt(cx + Math.cos(mid) * (pr + PROT * 0.4), cy + Math.sin(mid) * (pr + PROT * 0.4), R * (0.6 + z.width), `rgba(255,80,40,${blink})`);
+  }
+}
+
+function drawHeart(x, y, s, full) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.9);
+  ctx.bezierCurveTo(-s * 1.4, -s * 0.1, -s * 0.7, -s * 1.2, 0, -s * 0.45);
+  ctx.bezierCurveTo(s * 0.7, -s * 1.2, s * 1.4, -s * 0.1, 0, s * 0.9);
+  if (full) { ctx.fillStyle = '#ff4d6d'; ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 8; ctx.fill(); }
+  else { ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+function draw() {
+  const th = theme();
+  drawBackground(th);
+
+  ctx.save();
+  if (shake > 0 && settings.shake && !paused) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+
+  const boss = lv && lv.boss;
+  const now = performance.now() / 1000;
+  if (boss) { // boss sahnesi: kızıl karartma ve nabız gibi atan hale
+    ctx.fillStyle = 'rgba(40,0,0,0.35)'; ctx.fillRect(-20, -20, W + 40, H + 40);
+    const pulse = 0.5 + 0.5 * Math.sin(now * (boss.rage ? 9 : 4));
+    glowAt(cx, cy, R * (4.4 + pulse * 0.8), BOSSES[boss.idx].aura + (boss.rage ? 'aa' : '77'));
+  } else {
+    // kürenin arkasındaki hale
+    glowAt(cx, cy, R * 4.2, th.orb[0] + '55');
+  }
+
+  // saplanmış iğneler
+  for (const s of stuck) {
+    if (boss && state === 'win') break; // boss patlayınca iğneler savrulur (bounced olarak çizilir)
+    const wa = s.a + rot;
+    const len = L * (1 - (s.born || 0) * 0.25) + R * 0.1;
+    drawPin(cx + Math.cos(wa) * R * 0.9, cy + Math.sin(wa) * R * 0.9, wa, len, s.pre ? 'pin_old' : 'pin', !!s.hit);
+  }
+
+  // küre
+  let pr = R * (1 + orbPulse * 0.06);
+  if (boss && state === 'win') pr *= Math.max(0, 1 - stateT * 1.6); // boss parçalanıp küçülür
+  if (boss && boss.rage) pr *= 1 + 0.02 * Math.sin(now * 30);
+  const orbImg = boss ? IMG['boss' + (boss.idx + 1)] : IMG['orb' + (themeIndex() + 1)];
+  if (boss && !orbImg) {
+    const og = ctx.createRadialGradient(cx - pr * 0.35, cy - pr * 0.4, pr * 0.1, cx, cy, pr);
+    og.addColorStop(0, BOSSES[boss.idx].aura); og.addColorStop(1, '#1a0508');
+    ctx.fillStyle = og; ctx.beginPath(); ctx.arc(cx, cy, pr, 0, TAU); ctx.fill();
+  } else if (orbImg) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+    const oh = pr * 2 * (orbImg.height / orbImg.width);
+    ctx.drawImage(orbImg, -pr, -oh / 2, pr * 2, oh);
+    ctx.restore();
+  } else {
+    const og = ctx.createRadialGradient(cx - pr * 0.35, cy - pr * 0.4, pr * 0.1, cx, cy, pr);
+    og.addColorStop(0, th.orb[0]); og.addColorStop(1, th.orb[1]);
+    ctx.fillStyle = og; ctx.beginPath(); ctx.arc(cx, cy, pr, 0, TAU); ctx.fill();
+  }
+
+  // çıkıntılar
+  if (lv && pr > R * 0.35) for (const z of lv.zones) drawZone(z, pr); // boss küçülürken çıkıntılar da kaybolur
+
+  // altın hedef
+  if (lv && lv.gold && !lv.gold.taken) {
+    const ga = lv.gold.a + rot, now = performance.now() / 1000;
+    const gx = cx + Math.cos(ga) * (pr + R * 0.05), gy = cy + Math.sin(ga) * (pr + R * 0.05);
+    const gs = R * (0.34 + 0.04 * Math.sin(now * 6));
+    glowAt(gx, gy, gs * 3, `rgba(255,200,60,${0.45 + 0.2 * Math.sin(now * 6)})`);
+    ctx.save(); ctx.translate(gx, gy); ctx.rotate(ga + Math.PI / 2 + Math.sin(now * 3) * 0.15);
+    if (IMG.star) ctx.drawImage(IMG.star, -gs / 2, -gs / 2, gs, gs * IMG.star.height / IMG.star.width);
+    else { ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(0, 0, gs / 2.4, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // boss vuruş parlaması
+  if (boss && boss.flash > 0 && pr > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = boss.flash * 0.5;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, cy, pr * 0.98, 0, TAU); ctx.fill(); ctx.restore();
+  }
+
+  // küre ortası: seviye (boss'ta yüz görünsün diye yazılmaz)
+  if (!boss) {
+  ctx.font = `900 ${Math.round(R * 0.62)}px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = R * 0.07; ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  const label = started ? String(lv.n) : '▶';
+  ctx.strokeText(label, cx, cy + R * 0.04);
+  ctx.fillStyle = 'rgba(25,12,35,0.88)';
+  ctx.fillText(label, cx, cy + R * 0.04);
+  }
+
+  // uçan iğneler (uç yukarıda)
+  for (const p of flying) drawPin(cx, p.y, Math.PI / 2, L + R * 0.1);
+  for (const b of bounced) {
+    ctx.save(); ctx.globalAlpha = Math.max(0, b.life);
+    drawPin(b.x + Math.cos(b.r - Math.PI / 2) * L / 2, b.y + Math.sin(b.r - Math.PI / 2) * L / 2, b.r + Math.PI / 2, L);
+    ctx.restore();
+  }
+
+  // sprite efektleri
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (const f of fx) {
+    const im = IMG[f.name]; if (!im) continue;
+    const k = 1 - f.life / f.max;
+    const s = f.s0 + (f.s1 - f.s0) * (1 - Math.pow(1 - k, 3));
+    ctx.globalAlpha = Math.min(1, (f.life / f.max) * 1.6);
+    ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+    const ar = im.height / im.width;
+    ctx.drawImage(im, -s / 2, -s * ar / 2, s, s * ar);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // parçacıklar
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // sıradaki iğne ve kalan sayı (eski nokta dizisi iğnenin başıyla üst üste biniyordu)
+  if (started && lv && remaining > 0 && (state === 'play' || state === 'bossintro')) {
+    drawPin(cx, LAUNCH_Y, Math.PI / 2, L + R * 0.1);
+    ctx.fillStyle = th.accent;
+    ctx.font = `800 ${Math.round(Math.min(W, H) * 0.05)}px ${FONT}`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 6;
+    ctx.fillText(`× ${remaining}`, cx + HEAD * 3, LAUNCH_Y + L * 0.5);
+    ctx.shadowBlur = 0;
+  }
+
+  uiButtons = [];
+  const m = Math.min(W, H);
+  const top = 14 + SAFE.top, left = 16 + SAFE.left, right = W - 16 - SAFE.right;
+
+  // HUD
+  const fs = Math.round(m * 0.038);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 6;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.font = `800 ${fs}px ${FONT}`;
+  ctx.fillText(`SEVİYE ${lv ? lv.n : level}`, left, top);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = `600 ${Math.round(fs * 0.7)}px ${FONT}`;
+  ctx.fillText(`Rekor ${best}  ·  ★ ${totalStars()}`, left, top + fs * 1.25);
+  ctx.shadowBlur = 0;
+
+  // boss'a kalan yol: bu onluktaki 10 seviye, sonuncusu boss
+  if (lv && started) {
+    const base = Math.floor((lv.n - 1) / 10) * 10;
+    const dot = Math.max(3, fs * 0.2), gapX = dot * 3.2;
+    let y = top + fs * 2.35 + dot;
+    for (let i = 1; i <= 10; i++) {
+      const n = base + i, x = left + dot + (i - 1) * gapX;
+      const isBoss = i === 10, cur = n === lv.n, done = n < lv.n;
+      ctx.beginPath(); ctx.arc(x, y, isBoss ? dot * 1.5 : dot, 0, TAU);
+      ctx.fillStyle = cur ? (isBoss ? '#ff4d4d' : th.accent) : done ? 'rgba(255,255,255,0.75)' : isBoss ? 'rgba(255,77,77,0.45)' : 'rgba(255,255,255,0.22)';
+      ctx.fill();
+      if (cur) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    }
+    // canlar
+    if (lives > 0 || lv.n >= 12) {
+      const hs = fs * 0.5; y += dot + hs + 8;
+      for (let i = 0; i < MAX_LIVES; i++) drawHeart(left + hs + i * hs * 2.5, y, hs, i < lives);
+    }
+  }
+
+  // boss can barı
+  if (boss && started) {
+    const bw = Math.min(W * 0.4, 280), bh = 12, bx = cx - bw / 2, by = top + fs * 3.3;
+    const hp = 1 - boss.hits / lv.throwN;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = BOSSES[boss.idx].aura; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6;
+    ctx.font = `900 ${Math.round(fs * 0.85)}px ${FONT}`;
+    ctx.fillText(BOSSES[boss.idx].name, cx, by - 6);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(bx - 3, by - 3, bw + 6, bh + 6, 8); ctx.fill();
+    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    hg.addColorStop(0, '#ff3b3b'); hg.addColorStop(1, boss.rage ? '#ff9a3b' : '#ff5f7a');
+    ctx.fillStyle = hg; roundRect(bx, by, Math.max(0, bw * hp), bh, 6); ctx.fill();
+    if (boss.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${boss.flash * 0.7})`; roundRect(bx, by, Math.max(0, bw * hp), bh, 6); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, by - 2); ctx.lineTo(cx, by + bh + 2); ctx.stroke(); // öfke eşiği
+  }
+
+  // sağ üst: duraklat (oyunda) ya da ses (giriş ekranında)
+  const bs = 44;
+  if (started && !paused && state !== 'win') {
+    iconButton('ui_pause', right - bs, top - 4, bs, () => setPaused(true), '❚❚');
+  } else if (!started) {
+    iconButton('sound', right - bs, top - 4, bs, () => { settings.sound = !settings.sound; saveSettings(); }, settings.sound ? '🔊' : '🔇', !settings.sound);
+  }
+
+  // katmanlar
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  if (!started) {
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#fff';
+    ctx.font = `900 ${Math.round(m * 0.1)}px ${FONT}`;
+    ctx.fillText('İĞNE USTASI', cx, H * 0.64);
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.6 + 0.35 * Math.sin(performance.now() / 300)) + ')';
+    ctx.font = `700 ${Math.round(m * 0.045)}px ${FONT}`;
+    ctx.fillText(level > 1 ? `Devam etmek için dokun · Seviye ${level}` : 'Başlamak için dokun', cx, H * 0.72);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `500 ${Math.round(m * 0.034)}px ${FONT}`;
+    ctx.fillText('Bütün iğneleri küreye sapla.', cx, H * 0.79);
+    ctx.fillText('İğneler birbirine değmesin.', cx, H * 0.79 + m * 0.05);
+    ctx.shadowBlur = 0;
+    if (best > 1) { // rekor ve yıldız özeti
+      const ty = Math.min(H * 0.9, H - SAFE.bottom - m * 0.06), ts = m * 0.08;
+      const label = `Rekor: Seviye ${best}   ★ ${totalStars()}`;
+      ctx.font = `800 ${Math.round(m * 0.038)}px ${FONT}`;
+      const tw = ctx.measureText(label).width;
+      if (IMG.ui_trophy) ctx.drawImage(IMG.ui_trophy, cx - tw / 2 - ts - 6, ty - ts / 2, ts, ts * IMG.ui_trophy.height / IMG.ui_trophy.width);
+      ctx.fillStyle = '#ffd34d'; ctx.fillText(label, cx + (IMG.ui_trophy ? ts / 2 : 0) - 3, ty);
+    }
+  }
+
+  // ilk atışa kadar öğretici el
+  if (started && !tutorialDone && state === 'play' && !paused) {
+    const k = (performance.now() / 900) % 1;
+    const hx = cx - R * 1.5, hy = LAUNCH_Y + L * 0.2 + Math.sin(k * TAU) * 8;
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(hx, hy - R * 0.1, R * (0.15 + k * 0.5), 0, TAU); ctx.stroke();
+    if (IMG.ui_hand) { const hh = R * 0.9, hw = hh * IMG.ui_hand.width / IMG.ui_hand.height; ctx.drawImage(IMG.ui_hand, hx - hw * 0.35, hy - hh * 0.1, hw, hh); }
+    ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(m * 0.045)}px ${FONT}`;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8;
+    ctx.fillText('Ekrana dokun, iğne fırlasın', cx, H * 0.6); ctx.shadowBlur = 0;
+  }
+
+  if (banner && started && state === 'play' && banner.t < 2.6 && !paused) {
+    const bt = banner.t;
+    const a = Math.min(1, bt * 5) * Math.min(1, (2.6 - bt) * 3);
+    const yOff = (1 - Math.min(1, bt * 5)) * 20;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(10,6,20,0.6)';
+    roundRect(W / 2 - Math.min(W * 0.42, 230), H * 0.605 + yOff, Math.min(W * 0.84, 460), m * 0.2, 18); ctx.fill();
+    ctx.fillStyle = '#ffd34d';
+    ctx.font = `900 ${Math.round(m * 0.055)}px ${FONT}`;
+    ctx.fillText(banner.title, cx, H * 0.605 + m * 0.065 + yOff);
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.font = `600 ${Math.round(m * 0.036)}px ${FONT}`;
+    ctx.fillText(banner.text, cx, H * 0.605 + m * 0.14 + yOff);
+    ctx.globalAlpha = 1;
+  }
+  if (state === 'bossintro' && started) {
+    const it = stateT, dur = lv.introDur;
+    const a = Math.min(1, it * 5) * Math.min(1, (dur - it) * 4);
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, H * 0.58, W, m * 0.3);
+    const jx = (Math.random() - 0.5) * 6 * a;
+    ctx.shadowColor = BOSSES[boss.idx].aura; ctx.shadowBlur = 24;
+    ctx.fillStyle = '#ff4d4d';
+    ctx.font = `900 ${Math.round(m * 0.15 * (1 + Math.max(0, 0.3 - it)))}px ${FONT}`;
+    ctx.fillText('BOSS', cx + jx, H * 0.58 + m * 0.11);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = `800 ${Math.round(m * 0.05)}px ${FONT}`;
+    ctx.fillText(BOSSES[boss.idx].name, cx, H * 0.58 + m * 0.22);
+    ctx.globalAlpha = 1;
+  }
+  if (state === 'fail') {
+    ctx.fillStyle = `rgba(255,40,60,${flash * 0.35})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = Math.min(1, stateT * 3);
+    const pw = Math.min(W * 0.84, 440), ph = m * 0.5, px = cx - pw / 2, py = H * 0.58;
+    ctx.fillStyle = 'rgba(10,6,20,0.72)'; roundRect(px, py, pw, ph, 22); ctx.fill();
+    ctx.fillStyle = '#ff6b81';
+    ctx.font = `900 ${Math.round(m * 0.075)}px ${FONT}`;
+    ctx.fillText(failInfo.reason === 'bomb' ? 'BOOM!' : 'ÇARPIŞTI!', cx, py + m * 0.075);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = `600 ${Math.round(m * 0.036)}px ${FONT}`;
+    const tip = failInfo.reason === 'bomb' ? 'Kırmızı çıkıntı aşağıdayken atma' : 'İki iğne arasında boşluk bekle';
+    ctx.fillText(tip, cx, py + m * 0.15);
+    ctx.fillText(`${remaining + 1} iğne kalmıştı`, cx, py + m * 0.2);
+    // tekrar düğmesi
+    const rb = m * 0.17, ready = stateT > RETRY_DELAY;
+    ctx.globalAlpha *= ready ? 1 : 0.35;
+    iconButton('ui_restart', cx - rb / 2, py + m * 0.25, rb, () => { if (stateT > RETRY_DELAY) startLevel(); }, '↻');
+    ctx.globalAlpha = Math.min(1, stateT * 3) * (ready ? 0.6 + 0.3 * Math.sin(performance.now() / 250) : 0.3);
+    ctx.fillStyle = '#fff'; ctx.font = `600 ${Math.round(m * 0.032)}px ${FONT}`;
+    ctx.fillText('ya da ekrana dokun', cx, py + m * 0.46);
+    ctx.globalAlpha = 1;
+  }
+  if (state === 'win') {
+    const end = boss ? 1.9 : 1;
+    const a = Math.min(1, stateT * 4) * (stateT > end ? Math.max(0, 1 - (stateT - end) * 4) : 1);
+    ctx.globalAlpha = a;
+    if (IMG.star) {
+      const s = m * 0.11;
+      for (let i = -1; i <= 1; i++) {
+        const got = i + 2 <= lastStars;
+        const pop = Math.max(0, Math.min(1, (stateT - 0.1 - (i + 1) * 0.12) * 6)); // yıldızlar sırayla belirir
+        const ss = (i === 0 ? s * 1.25 : s) * (got ? 0.6 + 0.4 * pop + 0.08 * Math.sin(stateT * 10) : 0.85);
+        ctx.save(); ctx.globalAlpha = a * (got ? pop : 0.3);
+        if (!got) ctx.filter = 'grayscale(1) brightness(0.5)';
+        ctx.drawImage(IMG.star, cx + i * s * 1.15 - ss / 2, H * 0.58 - ss / 2 - (i === 0 ? s * 0.2 : 0), ss, ss);
+        ctx.restore();
+      }
+    }
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10;
+    ctx.fillStyle = th.accent;
+    ctx.font = `900 ${Math.round(m * 0.08)}px ${FONT}`;
+    ctx.fillText(boss ? 'BOSS YENİLDİ!' : lastStars === 3 ? 'KUSURSUZ!' : 'HARİKA!', cx, H * 0.7);
+    ctx.font = `700 ${Math.round(m * 0.034)}px ${FONT}`;
+    if (boss) {
+      ctx.fillStyle = '#ff6b81';
+      ctx.fillText(boss.reward ? '♥ +1 can kazandın' : '♥ Canların dolu', cx, H * 0.76);
+    } else if (lastStars < 3) {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillText(runStats.lifeUsed ? '★ Can harcamadan bitir' : '★ Metale çarpmadan bitir', cx, H * 0.76);
+    }
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  if (paused) drawPauseMenu(th, m);
+}
+
+// Görselli yuvarlak düğme (görsel yoksa yazıya düşer)
+function iconButton(name, x, y, s, action, fallback, dim) {
+  const im = IMG[name];
+  ctx.save();
+  if (dim) ctx.globalAlpha *= 0.45;
+  if (im) ctx.drawImage(im, x, y, s, s * im.height / im.width);
+  else {
+    ctx.fillStyle = 'rgba(20,24,60,0.85)'; ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s / 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `700 ${Math.round(s * 0.45)}px ${FONT}`;
+    ctx.fillText(fallback, x + s / 2, y + s / 2);
+  }
+  ctx.restore();
+  addButton(x - 6, y - 6, s + 12, s + 12, action);
+}
+
+function drawPauseMenu(th, m) {
+  ctx.fillStyle = 'rgba(6,4,16,0.88)'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const pw = Math.min(W - 32, 420), px = cx - pw / 2;
+  let y = Math.max(SAFE.top + 40, H * 0.12);
+  ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(m * 0.08)}px ${FONT}`;
+  ctx.fillText('DURAKLATILDI', cx, y); y += m * 0.1;
+
+  // büyük düğmeler: devam / baştan
+  const bb = m * 0.2;
+  iconButton('ui_play', cx - bb - 14, y, bb, () => setPaused(false), '▶');
+  iconButton('ui_restart', cx + 14, y, bb, () => { paused = false; startLevel(); musicUpdate(); }, '↻');
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = `700 ${Math.round(m * 0.034)}px ${FONT}`;
+  ctx.fillText('Devam', cx - bb / 2 - 14, y + bb + 16);
+  ctx.fillText('Baştan', cx + bb / 2 + 14, y + bb + 16);
+  y += bb + 56;
+
+  // ayarlar: dört açma/kapama düğmesi
+  const toggles = [['ui_music', 'Müzik', 'music'], ['sound', 'Ses', 'sound'], ['ui_vibe', 'Titreşim', 'vibe'], ['ui_shake', 'Sarsıntı', 'shake']];
+  const ts = Math.min(m * 0.14, 64), tg = (pw - ts * 4) / 3;
+  toggles.forEach(([icon, label, key], i) => {
+    const x = px + i * (ts + tg);
+    iconButton(icon, x, y, ts, () => { settings[key] = !settings[key]; saveSettings(); if (key === 'vibe' && settings.vibe) vibrate(30); }, label[0], !settings[key]);
+    if (!settings[key]) { ctx.strokeStyle = '#ff6b81'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + ts * 0.18, y + ts * 0.82); ctx.lineTo(x + ts * 0.82, y + ts * 0.18); ctx.stroke(); }
+    ctx.fillStyle = settings[key] ? '#fff' : 'rgba(255,255,255,0.45)'; ctx.font = `700 ${Math.round(m * 0.03)}px ${FONT}`;
+    ctx.fillText(label, x + ts / 2, y + ts + 14);
+  });
+  y += ts + 54;
+
+  // seviye seçimi (oynadığın seviyeler)
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; roundRect(px, y, pw, m * 0.15, 16); ctx.fill();
+  const rowY = y + m * 0.075;
+  ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(m * 0.042)}px ${FONT}`;
+  ctx.fillText(`Seviye ${menuLevel}` + (starsByLevel[menuLevel] ? '  ' + '★'.repeat(starsByLevel[menuLevel]) : ''), cx, rowY);
+  const ab = m * 0.11;
+  const arrow = (dx, txt, fn) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.beginPath(); ctx.arc(dx, rowY, ab / 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(ab * 0.5)}px ${FONT}`; ctx.fillText(txt, dx, rowY + 1);
+    addButton(dx - ab / 2, rowY - ab / 2, ab, ab, fn);
+  };
+  arrow(px + ab * 0.7, '‹', () => { menuLevel = menuLevel > 1 ? menuLevel - 1 : best; });
+  arrow(px + pw - ab * 0.7, '›', () => { menuLevel = menuLevel < best ? menuLevel + 1 : 1; });
+  y += m * 0.15 + 14;
+  const go = menuLevel !== lv.n;
+  ctx.globalAlpha = go ? 1 : 0.35;
+  ctx.fillStyle = th.accent; roundRect(px + pw * 0.2, y, pw * 0.6, m * 0.11, 14); ctx.fill();
+  ctx.fillStyle = '#1a1030'; ctx.font = `900 ${Math.round(m * 0.04)}px ${FONT}`;
+  ctx.fillText('Bu seviyeyi oyna', cx, y + m * 0.055);
+  ctx.globalAlpha = 1;
+  if (go) addButton(px + pw * 0.2, y, pw * 0.6, m * 0.11, () => goToLevel(menuLevel));
+  y += m * 0.11 + 22;
+
+  // ilerlemeyi sıfırla (iki dokunuşla onay)
+  ctx.fillStyle = resetArmed ? '#ff6b81' : 'rgba(255,255,255,0.4)';
+  ctx.font = `600 ${Math.round(m * 0.032)}px ${FONT}`;
+  const rt = resetArmed ? 'Emin misin? Tekrar dokun: her şey silinir' : 'İlerlemeyi sıfırla';
+  ctx.fillText(rt, cx, y + 10);
+  addButton(cx - pw / 2, y - 8, pw, 36, () => {
+    if (!resetArmed) { resetArmed = true; return; }
+    try { for (const k of Object.keys(localStorage)) if (k.startsWith('igne_')) localStorage.removeItem(k); } catch {}
+    store.set('settings', settings);
+    level = 1; best = 1; lives = 0; tutorialDone = false;
+    for (const k of Object.keys(seen)) delete seen[k];
+    for (const k of Object.keys(starsByLevel)) delete starsByLevel[k];
+    paused = false; startLevel(); musicUpdate();
+  });
+}
+
+// ---------- loop ----------
+// Sabit adımlı döngü: yavaş telefonda oyun ağır çekime düşmez, hızlı ekranda hızlanmaz
+const STEP = 1 / 120;
+let last = performance.now(), acc = 0;
+function frame(now) {
+  acc += Math.min(0.1, (now - last) / 1000); last = now;
+  if (paused) acc = 0;
+  while (acc >= STEP) { update(STEP); acc -= STEP; }
+  draw();
+  requestAnimationFrame(frame);
+}
+layout();
+startLevel();
+started = false;
+// Ana ekrana eklenince çevrimdışı da açılsın (yalnızca http/https üzerinde)
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+// Test botu: gerçek oyun mantığını görüntüsüz çalıştırır, mükemmel zamanlamayla atış yapar.
+// Sonuç: seviye çözülebilir mi, son atışlarda açıların ne kadarı güvenliydi (insan için zorluk ölçüsü).
+function simLevel(n, maxTime = 150) {
+  const bk = { level, best, lives, banner, started, bossIntroSeen, seen: { ...seen } };
+  SIM = true;
+  level = n; lives = 0; started = true; startLevel();
+  if (state === 'bossintro') { state = 'play'; stateT = 0; }
+  const dt = 1 / 120, travel = (LAUNCH_Y - (cy + R)) / Math.max(H * 3.2, 1800);
+  const safeAt = (a) => !lv.zones.some(z => inArc(a, { start: z.start - GAP * 0.6, width: z.width + GAP * 1.2 })) &&
+    stuck.every(s => angDiff(s.a, a) > GAP * 1.3);
+  let time = 0, throws = 0, minFree = 1, lastFree = 1, result = 'timeout';
+  while (time < maxTime) {
+    if (state === 'play' && flying.length === 0 && remaining > 0) {
+      const t0 = t; let rr = rot;
+      for (let k = 0; k < Math.ceil(travel / dt); k++) { rr += angularVelocity() * dt; t += dt; }
+      t = t0;
+      if (safeAt(norm(Math.PI / 2 - rr))) {
+        let ok = 0; for (let i = 0; i < 180; i++) if (safeAt(i / 180 * TAU)) ok++;
+        lastFree = ok / 180; minFree = Math.min(minFree, lastFree);
+        throwPin(); throws++;
+      }
+    }
+    update(dt); time += dt;
+    if (state === 'win') { result = 'win'; break; }
+    if (state === 'fail') { result = 'fail:' + failInfo.reason; break; }
+  }
+  const out = { n, result, time: +time.toFixed(1), throws, pins: lv.throwN, pre: lv.pre.length, zones: lv.zones.length, minFree: +minFree.toFixed(2), boss: !!lv.boss };
+  SIM = false;
+  level = bk.level; best = bk.best; lives = bk.lives; started = bk.started; bossIntroSeen = bk.bossIntroSeen;
+  for (const k of Object.keys(seen)) delete seen[k]; Object.assign(seen, bk.seen);
+  startLevel(); banner = bk.banner;
+  return out;
+}
+
+// debug hook for testing
+window.__igne = { get state() { return { level, state, remaining, stuck: stuck.length, zones: lv.zones.length, pattern: lv.pattern }; }, goto(n) { level = n; started = true; startLevel(); }, throw: throwPin, get lv() { return lv; }, get rot() { return rot; }, get lives() { return lives; }, boom() { fail('bomb', cx, cy + R * 1.3); }, win, sim: simLevel, rage() { lv.boss.hits = Math.ceil(lv.throwN / 2); remaining = lv.throwN - lv.boss.hits; bossRage(); } };
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
