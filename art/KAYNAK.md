@@ -15,7 +15,8 @@ Oyundaki tüm görseller OpenAI GPT görsel üretimiyle, Codex CLI üzerinden ü
 | `art/skills.png` | 3×3: Yavaşlat, +2 İğne, +15 Saniye jokerleri; küçük/orta/büyük altın paketi; market, harita, kilit simgeleri | `assets/sk_*.png`, `pack_*.png`, `shop.png`, `map.png`, `lock.png` |
 | `art/mapbg/map1..3.png` | 1024×1536 harita arka planları: gündüz tepeler, günbatımı dağlar, auroralı gece | `assets/map1..3.webp` (kısımlarda sırayla) |
 | `art/needles.png` | 2×1, yeşil perde: düz gümüş dikiş iğnesi ve eski bronz iğne (topuzsuz) | `assets/pin.png`, `assets/pin_old.png` (parts.png içindeki topuzlu iğnelerin yerine) |
-| `art/sk_pins2.png` | +2 İğne joker simgesi, düz iğnelerle; yeşil zemin yalnızca kenardan silindi (yeşil artı rozeti korunur) | `assets/sk_pins2.png` |
+| `art/sk_arrows2.png` | +2 Ok joker simgesi: çapraz iki ok ve yeşil artı rozeti (macenta perde, yalnızca kenardan silindi) | `assets/sk_pins2.png` |
+| `art/sk_pins2.png` | (eski) +2 İğne joker simgesi, düz iğnelerle; yeşil zemin yalnızca kenardan silindi (yeşil artı rozeti korunur) | `assets/sk_pins2.png` |
 | `art/logo.png` | Orbitapp logosu: "O" harfi iğne saplı parlak küre, yörünge çizgisi; yeşil perdede üretildi | `assets/logo.png` (900 px), giriş ekranı ve hoş geldin penceresi |
 | `art/arrows.png` | 2×1, yeşil perde: oyuncu oku (açık ahşap, turuncu-altın tüy) ve eski koyu ok | `assets/arrow.png`, `assets/arrow_old.png` (iğnelerin yerine) |
 | `art/orbs_theme_a..g.png` | 3×1, yeşil ya da mavi perde: 20 kısmın temalı küreleri (perde yalnızca kenardan silinir) | `assets/orb1..orb20.png` (560 px) |

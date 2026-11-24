@@ -307,3 +307,24 @@ if (existsSync(art('concept'))) {
     console.log('bg' + m[1], '(konsept)');
   }
 }
+
+// ---------- +2 Ok joker simgesi (macenta perde) → assets/sk_pins2.png ----------
+if (existsSync(art('sk_arrows2.png'))) {
+  const { data, info } = await sharp(art('sk_arrows2.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = Buffer.from(data), w = info.width, h = info.height;
+  const isKey = (i) => { const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2]; return r > 120 && b > 120 && g < Math.min(r, b) * 0.6; };
+  const seen = new Uint8Array(w * h), st = [];
+  for (let x = 0; x < w; x++) st.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) st.push(y * w, y * w + w - 1);
+  while (st.length) { const i = st.pop(); if (seen[i] || !isKey(i)) continue; seen[i] = 1; px[i * 4 + 3] = 0;
+    const x = i % w, y = (i / w) | 0; if (x > 0) st.push(i - 1); if (x < w - 1) st.push(i + 1); if (y > 0) st.push(i - w); if (y < h - 1) st.push(i + w); }
+  for (let i = 0; i < w * h; i++) { // kenarda kalan macenta taşmasını bastır
+    if (seen[i]) continue; const x = i % w, y = (i / w) | 0;
+    if (!((x > 0 && seen[i - 1]) || (x < w - 1 && seen[i + 1]) || (y > 0 && seen[i - w]) || (y < h - 1 && seen[i + w]))) continue;
+    const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+    if (Math.min(r, b) > g + 30) { px[i * 4] = px[i * 4 + 2] = g; px[i * 4 + 3] = Math.round(px[i * 4 + 3] * 0.5); }
+  }
+  const buf = await sharp(px, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+  await sharp(await sharp(buf).trim({ threshold: 1 }).png().toBuffer()).resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile(out('sk_pins2.png'));
+  console.log('sk_pins2 (oklu)');
+}

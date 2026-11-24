@@ -252,7 +252,7 @@ const SPRITES = ['arrow', 'arrow_old', 'bomb', 'shield', 'star', 'sound', 'fx_bo
   'bal_blue', 'bal_gold', 'bal_lock', 'bal_boss', 'bal_bonus', 'bal_timed', 'milestone', 'chest', 'coin',
   'sk_slow', 'sk_pins2', 'sk_time15', 'pack_s', 'pack_m', 'pack_l', 'shop', 'map', 'lock'];
 // Görsel sürümü: bir görsel değişince artırılır (sw.js içindeki ASSET_V ile aynı), önbellek eski görseli vermez
-const ASSET_V = 13;
+const ASSET_V = 14;
 const loadImg = (key, src) => { if (IMG[key] || IMG[key] === null) return; IMG[key] = null; const im = new Image(); im.onload = () => { IMG[key] = im; }; im.src = `${src}?v=${ASSET_V}`; };
 for (const n of SPRITES) loadImg(n, `assets/${n}.png`);
 for (let i = 1; i <= 3; i++) loadImg('map' + i, `assets/map${i}.webp`);
