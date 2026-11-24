@@ -214,30 +214,30 @@ function musicTick() {
 
 // ---------- temalar ----------
 // 20 kısım, her birinin kendi küresi, arka planı ve canlıları var.
-// inner: küre içinde dönen parçacık, back: arka plan parçacığı, cast: arka planda hareket eden canlılar [sprite, adet, davranış, boy]
+// inner: küre içinde dönen parçacık, back: arka planda süzülen hafif parçacık (canlılar arka plan çizimlerinin içinde)
 const MAX_CHAPTER = 20;
-const T = (c0, c1, accent, inner, innerC, back, backC, cast = [], extra = {}) => ({ bg: [c0, c1], orb: [accent, c1], pin: '#fff', accent, glow: accent, inner, innerC, back, backC, cast, ...extra });
+const T = (c0, c1, accent, inner, innerC, back, backC, extra = {}) => ({ bg: [c0, c1], orb: [accent, c1], pin: '#fff', accent, glow: accent, inner, innerC, back, backC, ...extra });
 const THEMES = [
-  T('#3a1d40', '#140a1c', '#ffb347', 'spark', '#fff3b0', 'mote', '#ffd27a', [['bee', 3, 'fly', 0.3], ['butterfly_o', 2, 'flutter', 0.3]]),
-  T('#0f3a44', '#06131c', '#38f0d8', 'bubble', '#e8fffb', 'bubble', '#bff9ef', [['fish', 4, 'swim', 0.3], ['seagull', 2, 'fly', 0.36]]),
-  T('#4a1640', '#1c0718', '#ff86d9', 'puff', '#ffe3f6', 'petal', '#ffc2ea', [['cloud', 3, 'drift', 0.8], ['balloon', 2, 'rise', 0.36]]),
-  T('#1f3a10', '#0b1205', '#8dff5a', 'firefly', '#f4ff8a', 'firefly', '#f4ff8a', [['butterfly_b', 3, 'flutter', 0.3], ['leaf', 6, 'fall', 0.18]]),
-  T('#141c4a', '#05081c', '#8a96ff', 'star', '#ffffff', 'star', '#dfe4ff', [['planet', 2, 'drift', 0.4], ['comet', 2, 'streak', 0.6]]),
-  T('#3a1014', '#100506', '#ff4d6d', 'glint', '#ffe0e6', 'ember', '#ff9a6b', [['phoenix', 2, 'fly', 0.45], ['shard', 4, 'float', 0.22]]),
-  T('#4a1a3a', '#1c0a18', '#ff7ac8', 'spark', '#ffffff', 'confetti', '#ffffff', [['balloon', 2, 'rise', 0.36], ['cloud', 2, 'drift', 0.7]]),
-  T('#1a3550', '#081422', '#9fe6ff', 'glint', '#ffffff', 'snow', '#ffffff', []),
-  T('#2a2a55', '#10102a', '#ffd86b', 'spark', '#ffffff', 'confetti', '#ffffff', [['butterfly_o', 2, 'flutter', 0.3], ['balloon', 1, 'rise', 0.36], ['cloud', 2, 'drift', 0.7]]),
-  T('#4a3010', '#1a1005', '#ffc14d', 'spark', '#fff1c0', 'mote', '#ffe0a0', [['seagull', 2, 'fly', 0.32]]),
-  T('#3a1508', '#120502', '#ff7a2a', 'glint', '#ffd0a0', 'ember', '#ffae5a', [['phoenix', 2, 'fly', 0.42]]),
-  T('#2a1440', '#0e0618', '#7dffd8', 'firefly', '#b8fff0', 'firefly', '#ffd08a', [['butterfly_b', 2, 'flutter', 0.28]]),
-  T('#3a2810', '#140d05', '#ffb35c', 'glint', '#fff0c8', 'mote', '#ffd9a0', [['balloon', 2, 'rise', 0.34]]),
-  T('#0f3440', '#051218', '#ffd34d', 'bubble', '#fff6d0', 'bubble', '#d8fff6', [['seagull', 2, 'fly', 0.34], ['fish', 2, 'swim', 0.28]]),
-  T('#3a2038', '#140a14', '#ffa8d8', 'puff', '#fff0f8', 'petal', '#ffc8e4', [['butterfly_o', 2, 'flutter', 0.28], ['butterfly_b', 1, 'flutter', 0.28]]),
-  T('#262a44', '#0c0d18', '#ffe14d', 'glint', '#fff8b0', 'rain', '#c8d8ff', [['cloud', 3, 'drift', 0.8]], { storm: true }),
-  T('#081a3a', '#020814', '#ff6fd8', 'bubble', '#9ff7ff', 'bubble', '#9ff7ff', [['fish', 3, 'swim', 0.26]]),
-  T('#16283a', '#060c14', '#4df0ff', 'glint', '#c8ffff', 'mote', '#7ff4ff', []),
-  T('#141a40', '#050618', '#c88cff', 'star', '#ffffff', 'snow', '#ffffff', [['comet', 1, 'streak', 0.6]]),
-  T('#4a3008', '#1a1002', '#ffd23d', 'spark', '#fffbe0', 'mote', '#fff0a0', [['phoenix', 1, 'fly', 0.5]]),
+  T('#3a1d40', '#140a1c', '#ffb347', 'spark', '#fff3b0', 'mote', '#ffd27a'),
+  T('#0f3a44', '#06131c', '#38f0d8', 'bubble', '#e8fffb', 'bubble', '#bff9ef'),
+  T('#4a1640', '#1c0718', '#ff86d9', 'puff', '#ffe3f6', 'petal', '#ffc2ea'),
+  T('#1f3a10', '#0b1205', '#8dff5a', 'firefly', '#f4ff8a', 'firefly', '#f4ff8a'),
+  T('#141c4a', '#05081c', '#8a96ff', 'star', '#ffffff', 'star', '#dfe4ff'),
+  T('#3a1014', '#100506', '#ff4d6d', 'glint', '#ffe0e6', 'ember', '#ff9a6b'),
+  T('#4a1a3a', '#1c0a18', '#ff7ac8', 'spark', '#ffffff', 'confetti', '#ffffff'),
+  T('#1a3550', '#081422', '#9fe6ff', 'glint', '#ffffff', 'snow', '#ffffff'),
+  T('#2a2a55', '#10102a', '#ffd86b', 'spark', '#ffffff', 'confetti', '#ffffff'),
+  T('#4a3010', '#1a1005', '#ffc14d', 'spark', '#fff1c0', 'mote', '#ffe0a0'),
+  T('#3a1508', '#120502', '#ff7a2a', 'glint', '#ffd0a0', 'ember', '#ffae5a'),
+  T('#2a1440', '#0e0618', '#7dffd8', 'firefly', '#b8fff0', 'firefly', '#ffd08a'),
+  T('#3a2810', '#140d05', '#ffb35c', 'glint', '#fff0c8', 'mote', '#ffd9a0'),
+  T('#0f3440', '#051218', '#ffd34d', 'bubble', '#fff6d0', 'bubble', '#d8fff6'),
+  T('#3a2038', '#140a14', '#ffa8d8', 'puff', '#fff0f8', 'petal', '#ffc8e4'),
+  T('#262a44', '#0c0d18', '#ffe14d', 'glint', '#fff8b0', 'rain', '#c8d8ff', { storm: true }),
+  T('#081a3a', '#020814', '#ff6fd8', 'bubble', '#9ff7ff', 'bubble', '#9ff7ff'),
+  T('#16283a', '#060c14', '#4df0ff', 'glint', '#c8ffff', 'mote', '#7ff4ff'),
+  T('#141a40', '#050618', '#c88cff', 'star', '#ffffff', 'snow', '#ffffff'),
+  T('#4a3008', '#1a1002', '#ffd23d', 'spark', '#fffbe0', 'mote', '#fff0a0'),
 ];
 const chapterName = (c) => t('ch' + ((c - 1) % MAX_CHAPTER + 1));
 let viewChapter = 1; // haritada bakılan kısım
@@ -291,8 +291,9 @@ function difficulty(c, i) {
   const start = Math.min(1 + (c - 1) * 0.75, 4), peak = Math.min(5.5 + (c - 1) * 0.5, 8.5);
   return start + (peak - start) * (clamp(i, 1, 10) - 1) / 9;
 }
-// Zorluğu üretecin eski "seviye numarası" ölçeğine çevirir (d=1 → 1, d=8.5 → ≈50)
-const diffToN = (d) => 1 + (d - 1) * 6.5;
+// Zorluğu üretecin eski "seviye numarası" ölçeğine çevirir (d=1 → 1.2, d=8.5 → ≈60)
+const DIFF_BOOST = 1.2; // genel zorluk çarpanı (%20 daha zor)
+const diffToN = (d) => (1 + (d - 1) * 6.5) * DIFF_BOOST;
 
 function makeLevel(node) {
   if (node.kind === 'bonus') return makeBonus(node);

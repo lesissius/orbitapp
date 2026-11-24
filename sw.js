@@ -1,6 +1,6 @@
 // Çevrimdışı oynama: oyun dosyaları ilk açılışta önbelleğe alınır.
 // Oyun güncellenince VERSION'u ve index.html içindeki ?v= sayısını artırın; görsel değişince ASSET_V'yi (burada ve js/core.js) artırın.
-const VERSION = 'igne-v15';
+const VERSION = 'igne-v16';
 const ASSET_V = 14; // js/core.js içindeki ASSET_V ile aynı olmalı
 const SPRITES = ['arrow', 'arrow_old', 'bomb', 'shield', 'star', 'sound', 'fx_boom', 'fx_ring', 'fx_spark', 'fx_gold', 'fx_metal', 'fx_glow',
   'orb1', 'orb2', 'boss1', 'boss2', 'boss3',
